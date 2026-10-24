@@ -1,16 +1,20 @@
 # Linux Kernel Security Updater (LKSU)
 
-> **Status: early preview.** Unit tested, but not yet integration tested across AlmaLinux 8/9/10, BIOS/UEFI, DNF and GRUB combinations. Do not activate automatic installation on production hosts until those checks and a provider-console recovery drill pass.
+![LKSU kernel update, verification and fallback illustration](docs/assets/lksu-hero.png)
+
+> **Status: v0.2 early preview.** Unit tested, but not yet integration tested across AlmaLinux 8/9/10, BIOS/UEFI, DNF and GRUB combinations. Do not activate automatic installation or reboot on production hosts until those checks and a provider-console recovery drill pass.
 
 Early production-oriented release for **AlmaLinux 8, 9 and 10**. LKSU uses the distribution's enabled DNF repositories. It does not enable testing repositories, select a CVE-specific build, download arbitrary RPMs, or reboot a machine automatically.
 
 ## Safety model
 
 - Default policy is `check-only`. The scheduled timer checks daily and emails a report.
-- Optional `all-stable` policy permits scheduled installation of available kernel package updates from already enabled repositories. LKSU does not currently classify advisories reliably enough to offer a `security-only` policy. Confirm enabled repositories and the DNF transaction before selecting `all-stable`.
+- `security-only` reads DNF security updateinfo and reports advisory IDs, severity, affected kernel packages and CVEs. `all-stable` permits all kernel updates from enabled repositories.
 - Before installation LKSU checks AlmaLinux version, root privileges, required tools, `/boot` free space, a GRUB configuration, the running kernel's image, and its installed RPM. Its disk threshold is 500 MiB; host-specific layouts may require more.
 - Installation overrides DNF's `installonly_limit` to preserve installed kernels. LKSU checks that the running kernel's RPM and boot image still exist, then records the previous kernel. It does **not** create a full boot, VM, filesystem, or data backup.
-- The administrator controls the reboot in an approved maintenance window. After boot, `lksu verify` compares the running kernel to the saved target and checks configured systemd services. Application and website checks remain the administrator's responsibility.
+- Maintenance windows use an explicit local start time and duration. Installation and reboot are separate operations; automatic reboot defaults to disabled.
+- A trial reboot keeps the old kernel as the persistent GRUB default and selects the new kernel once with `grub2-reboot`. Successful service and HTTP/HTTPS health checks promote the new kernel.
+- Agents can send HMAC-signed reports over HTTPS to the SQLite-backed `lksu-fleet` collector and bearer-token-protected web dashboard.
 - `lksu select-old` selects the previous kernel as the default for the **next** boot and verifies GRUB's selection. It does not cause a reboot or guarantee recovery from an unbootable machine. A failed boot may require a provider console and manual GRUB selection. Keep a current provider snapshot and console access.
 - A pending update blocks a second install until successful post-boot verification. Failed verification leaves the pending state and requires investigation.
 
@@ -37,8 +41,9 @@ To use automatic installation, change `policy` from `check-only` to `all-stable`
 
 ```bash
 sudo lksu check
-sudo lksu apply                 # requires all-stable policy
+sudo lksu apply                 # requires security-only or all-stable policy
 sudo cat /var/lib/lksu/state.json
+sudo lksu stage-reboot          # preserves old default, stages new kernel once
 # Confirm provider snapshot and console access, then reboot in an approved window.
 sudo reboot
 sudo lksu verify
@@ -58,6 +63,10 @@ If the new kernel does not boot at all, use the provider console to select the o
 
 ## Verification and release limits
 
-Run local tests with `python3 -m pip install -e .` and `python3 -m unittest discover -s tests -v`. The tests use temporary files and mocks; they do not prove real AlmaLinux DNF, GRUB, SMTP or recovery behavior. Before production use, perform an AlmaLinux 8/9/10 VM integration run and an actual console recovery drill. Do not treat the previous kernel as a complete backup. This release does not provide a maintenance-window reboot scheduler, automatic rollback, CVE mapping, or full application health checks; those features need host-specific validation before activation.
+Run local tests with `python3 -m pip install -e .` and `python3 -m unittest discover -s tests -v`. The tests use temporary files and mocks; they do not prove real AlmaLinux DNF metadata, GRUB one-shot behavior, reboot recovery, RPM installation, SMTP delivery, HTTP services or fleet TLS. Before production use, perform AlmaLinux 8/9/10 BIOS and UEFI VM integration runs and a real console recovery drill. The previous kernel is not a complete backup.
+
+`install.sh` installs the application without enabling timers or automatic actions. `packaging/lksu.spec` is an RPM packaging preview; a signed RPM still requires a real AlmaLinux build and signing pipeline. Example agent and collector configurations are provided in `config.example.json` and `fleet-server.example.json`.
+
+When `automatic_reboot` is explicitly set to `true`, `lksu maintenance` stages the one-shot trial and requests a reboot only after a successful installation inside the configured window. The default remains `false`.
 
 For `vmi942177`, the reported running kernel is `6.12.0-211.51.1.el10_2` and the previously observed repository candidate was `6.12.0-211.68.1.el10_2`. These are historical conversation values. Run `lksu check` on the actual host to establish current state before deciding on any update.

@@ -10,6 +10,8 @@ from datetime import datetime
 from email.message import EmailMessage
 
 from . import core
+from .fleet import send_report as send_fleet_report
+from .policy import in_maintenance_window
 
 
 def setup():
@@ -29,16 +31,19 @@ def setup():
     password = getpass.getpass("SMTP password or app password: ")
     if not user or not password:
         raise core.LKSUError("SMTP authentication is required")
-    policy = input("Install policy [check-only/all-stable] (default check-only): ").strip() or "check-only"
-    if policy not in {"check-only", "all-stable"}:
+    policy = input("Install policy [check-only/security-only/all-stable] (default check-only): ").strip() or "check-only"
+    if policy not in {"check-only", "security-only", "all-stable"}:
         raise core.LKSUError("Invalid install policy")
     services = input("Services to verify after reboot (comma separated, optional): ").strip()
     parsed = [x.strip() for x in services.split(",") if x.strip()]
     if any(not re.fullmatch(r"[A-Za-z0-9_.@-]+", x) for x in parsed):
         raise core.LKSUError("Invalid service name")
+    health_urls = input("HTTP/HTTPS health URLs (comma separated, optional): ").strip()
+    parsed_urls = [{"url": x.strip(), "status": 200} for x in health_urls.split(",") if x.strip()]
     core.save(core.CONFIG, {"email": email, "smtp_host": host, "smtp_port": port,
                             "smtp_user": user, "smtp_password": password, "policy": policy,
-                            "services": parsed, "automatic_reboot": False})
+                            "services": parsed, "health_urls": parsed_urls, "automatic_reboot": False,
+                            "maintenance_window": {"start": "03:00", "duration_minutes": 60}})
     print("Configuration saved; automatic reboot is disabled.")
 
 
@@ -64,8 +69,9 @@ def send_report(cfg, subject, body):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="AlmaLinux Kernel Security Updater")
-    parser.add_argument("command", choices=("configure", "check", "scheduled", "apply", "verify", "select-old"))
+    parser.add_argument("command", choices=("configure", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old"))
     args = parser.parse_args(argv)
+    reboot_requested = False
     try:
         if args.command == "configure":
             setup()
@@ -78,17 +84,34 @@ def main(argv=None):
                 raise core.LKSUError("Root required")
             result = core.apply(cfg["policy"])
         elif args.command == "scheduled":
-            result = core.apply(cfg["policy"]) if cfg["policy"] == "all-stable" else core.check()
+            result = core.check()
+        elif args.command == "maintenance":
+            if not in_maintenance_window(cfg):
+                result = {"status": "outside-maintenance-window"}
+            else:
+                result = core.apply(cfg["policy"]) if cfg["policy"] != "check-only" else core.check()
+                if cfg.get("automatic_reboot") and result.get("status") == "installed-awaiting-manual-reboot":
+                    result["trial_boot"] = core.stage_trial_boot()
+                    reboot_requested = True
+        elif args.command == "stage-reboot":
+            if not in_maintenance_window(cfg):
+                raise core.LKSUError("Outside configured maintenance window")
+            result = core.stage_trial_boot()
+            if cfg.get("automatic_reboot"):
+                reboot_requested = True
         elif args.command == "verify":
-            result = core.verify(cfg.get("services", []))
+            result = core.verify(cfg)
         else:
             if os.geteuid():
                 raise core.LKSUError("Root required")
             result = {"old_default": core.select_old(), "rebooted": False}
         output = json.dumps(result, indent=2)
         print(output)
-        if args.command in {"scheduled", "apply", "verify"}:
+        if args.command in {"scheduled", "apply", "maintenance", "stage-reboot", "verify"}:
             send_report(cfg, f"LKSU {args.command} {datetime.now().isoformat(timespec='minutes')}", output)
+            send_fleet_report(cfg, {"command": args.command, "result": result, "hostname": os.uname().nodename, "reported_at": int(datetime.now().timestamp())})
+        if reboot_requested:
+            core.run("systemctl", "reboot")
         return 0 if not (args.command == "verify" and not result["healthy"]) else 2
     except (core.LKSUError, OSError, ValueError, KeyError, smtplib.SMTPException) as exc:
         print(f"LKSU error: {exc}", file=sys.stderr)

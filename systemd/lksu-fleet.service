@@ -1,0 +1,19 @@
+[Unit]
+Description=LKSU fleet report collector and dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/lksu-fleet --config /etc/lksu/fleet-server.json
+User=lksu-fleet
+Group=lksu-fleet
+Restart=on-failure
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/lksu-fleet
+
+[Install]
+WantedBy=multi-user.target

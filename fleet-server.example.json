@@ -1,0 +1,9 @@
+{
+  "bind": "0.0.0.0",
+  "port": 9443,
+  "database": "/var/lib/lksu-fleet/reports.sqlite3",
+  "tls_cert": "/etc/lksu/tls/fullchain.pem",
+  "tls_key": "/etc/lksu/tls/privkey.pem",
+  "dashboard_token": "REPLACE_WITH_A_LONG_RANDOM_TOKEN",
+  "servers": {"server-01": "REPLACE_WITH_THE_MATCHING_AGENT_SECRET"}
+}

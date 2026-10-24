@@ -7,4 +7,5 @@ build/
 dist/
 /config.json
 /state.json
+/tmp*/
 

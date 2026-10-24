@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ ${EUID} -ne 0 ]]; then echo "Run as root" >&2; exit 1; fi
+source /etc/os-release
+if [[ ${ID:-} != almalinux || ! ${VERSION_ID:-} =~ ^(8|9|10)(\.|$) ]]; then echo "AlmaLinux 8, 9 or 10 required" >&2; exit 1; fi
+dnf install -y python3 python3-pip grubby
+python3 -m pip install --prefix=/usr/local .
+install -D -m 0644 systemd/lksu.service /etc/systemd/system/lksu.service
+install -D -m 0644 systemd/lksu.timer /etc/systemd/system/lksu.timer
+install -D -m 0644 systemd/lksu-maintenance.service /etc/systemd/system/lksu-maintenance.service
+install -D -m 0644 systemd/lksu-maintenance.timer /etc/systemd/system/lksu-maintenance.timer
+install -D -m 0644 systemd/lksu-verify.service /etc/systemd/system/lksu-verify.service
+systemctl daemon-reload
+echo "Installed. Run: lksu configure"
+echo "No timer, automatic installation, or reboot was enabled."

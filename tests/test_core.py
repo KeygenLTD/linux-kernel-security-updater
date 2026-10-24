@@ -15,9 +15,9 @@ class KernelTests(unittest.TestCase):
             with self.assertRaises(core.LKSUError):
                 core.check()
 
-    def test_apply_rejects_security_only_policy(self):
+    def test_apply_rejects_unknown_policy(self):
         with self.assertRaises(core.LKSUError):
-            core.apply("security-only")
+            core.apply("anything")
 
     def test_apply_preserves_running_kernel_and_records_pending(self):
         with tempfile.TemporaryDirectory(dir=".") as temp:
@@ -39,9 +39,26 @@ class KernelTests(unittest.TestCase):
             with patch.object(core, "STATE", state), patch.object(core.os, "uname", create=True, return_value=type("U", (), {"release": "new"})()), patch.object(
                 core, "run", return_value=type("P", (), {"returncode": 1})()
             ):
-                result = core.verify(["lsws"])
+                with patch("lksu.health.check_all", return_value={"service:lsws": False}):
+                    result = core.verify({"services": ["lsws"]})
             self.assertFalse(result["healthy"])
             self.assertTrue(json.loads(state.read_text())["pending"])
+
+    def test_stage_trial_keeps_old_kernel_persistent(self):
+        with tempfile.TemporaryDirectory(dir=".") as temp:
+            state = Path(temp) / "state.json"
+            state.write_text(json.dumps({"pending": True, "old_kernel": "old", "new_default": "/boot/vmlinuz-new"}))
+            calls = []
+            def fake_run(*args, **kwargs):
+                calls.append(args)
+                stdout = 'id="machine-new.x86_64"\n' if args[:2] == ("grubby", "--info") else ""
+                return type("P", (), {"returncode": 0, "stdout": stdout, "stderr": ""})()
+            with patch.object(core, "STATE", state), patch.object(core, "run", side_effect=fake_run), patch.object(
+                core, "default_kernel", return_value="/boot/vmlinuz-old"
+            ), patch.object(core.shutil, "which", return_value="/usr/sbin/grub2-reboot"):
+                result = core.stage_trial_boot()
+            self.assertEqual(result["persistent_fallback"], "/boot/vmlinuz-old")
+            self.assertIn(("grub2-reboot", "machine-new.x86_64"), calls)
 
 
 if __name__ == "__main__":

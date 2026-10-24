@@ -106,13 +106,17 @@ def updates():
 def check():
     info = preflight()
     info["updates"] = updates()
+    from .policy import security_advisories
+    info["security_advisories"] = security_advisories()
     return info
 
 
 def apply(policy):
-    if policy != "all-stable":
-        raise LKSUError("Automatic installation requires policy=all-stable; security-only classification is not implemented")
+    if policy not in {"all-stable", "security-only"}:
+        raise LKSUError("Installation requires policy=all-stable or security-only")
     before = check()
+    if policy == "security-only" and not before["security_advisories"]:
+        return {"status": "no-security-updates", **before}
     if not before["updates"]:
         return {"status": "no-updates", **before}
     if STATE.exists() and json.loads(STATE.read_text()).get("pending"):
@@ -120,7 +124,10 @@ def apply(policy):
     old = before["running"]
     # Preserve the exact running kernel and its installed modules against DNF's installonly cleanup.
     # DNF installonly_limit is overridden for this transaction; never erase old RPMs here.
-    run("dnf", "-y", "--setopt=installonly_limit=0", "upgrade", *PACKAGES)
+    command = ["dnf", "-y", "--setopt=installonly_limit=0", "upgrade"]
+    if policy == "security-only":
+        command.append("--security")
+    run(*command, *PACKAGES)
     after = installed()
     if old not in after or not Path(f"/boot/vmlinuz-{old}").exists():
         raise LKSUError("Old kernel disappeared; inspect host before reboot")
@@ -132,21 +139,50 @@ def apply(policy):
     return {"status": "installed-awaiting-manual-reboot", **state}
 
 
-def verify(services):
+def verify(cfg):
     if not STATE.exists():
         raise LKSUError("No pending update")
     state = json.loads(STATE.read_text())
     if not state.get("pending"):
         raise LKSUError("No pending update")
     running = os.uname().release
-    results = {name: run("systemctl", "is-active", "--quiet", name, check=False).returncode == 0 for name in services}
+    from .health import check_all
+    results = check_all(cfg)
     healthy = running == state["new_default"].removeprefix("/boot/vmlinuz-") and all(results.values())
     report = {"healthy": healthy, "running": running, "services": results, "old_kernel": state["old_kernel"]}
     if healthy:
+        run("grubby", "--set-default", state["new_default"])
+        if default_kernel() != state["new_default"]:
+            raise LKSUError("New kernel health passed but persistent default could not be verified")
         state["pending"] = False
         state["last_known_good"] = running
         save(STATE, state)
     return report
+
+
+def stage_trial_boot():
+    """Keep old kernel persistent; select new kernel for one boot using GRUB next_entry."""
+    if not STATE.exists():
+        raise LKSUError("No pending update")
+    state = json.loads(STATE.read_text())
+    if not state.get("pending"):
+        raise LKSUError("No pending update")
+    old_image = f"/boot/vmlinuz-{state['old_kernel']}"
+    new_image = state["new_default"]
+    run("grubby", "--set-default", old_image)
+    if default_kernel() != old_image:
+        raise LKSUError("Could not preserve old kernel as persistent default")
+    info = run("grubby", "--info", new_image).stdout
+    entry = next((line.split("=", 1)[1].strip().strip('"') for line in info.splitlines() if line.startswith("id=")), None)
+    if not entry or not re.fullmatch(r"[A-Za-z0-9._+~-]+", entry):
+        raise LKSUError("Could not derive safe GRUB entry id for trial boot")
+    if not shutil.which("grub2-reboot"):
+        raise LKSUError("grub2-reboot is required for one-shot trial boot")
+    run("grub2-reboot", entry)
+    state["trial_entry"] = entry
+    state["persistent_fallback"] = old_image
+    save(STATE, state)
+    return {"trial_entry": entry, "persistent_fallback": old_image, "rebooted": False}
 
 
 def select_old():

@@ -1,0 +1,13 @@
+[Unit]
+Description=Verify a trial kernel after boot
+After=network-online.target multi-user.target
+Wants=network-online.target
+ConditionPathExists=/var/lib/lksu/state.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/lksu verify
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
