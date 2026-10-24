@@ -32,7 +32,24 @@ def setup():
     password = getpass.getpass("SMTP password or app password: ")
     if not user or not password:
         raise core.LKSUError("SMTP authentication is required")
+    def yes_no(prompt, default):
+        suffix = "Y/n" if default else "y/N"
+        value = input(f"{prompt} [{suffix}]: ").strip().lower()
+        if not value:
+            return default
+        if value not in {"y", "yes", "n", "no"}:
+            raise core.LKSUError("Answer y or n")
+        return value in {"y", "yes"}
+
+    automatic_updates = yes_no("Enable automatic kernel updates?", False)
+    notifications = yes_no("Send an email after every check/update?", True)
+    automatic_reboot = yes_no("Enable automatic reboot?", False)
+    use_window = yes_no("Use a maintenance window?", False)
+    start = input("Maintenance start [03:00]: ").strip() or "03:00" if use_window else "03:00"
+    duration = int(input("Maintenance duration in minutes [60]: ").strip() or "60") if use_window else 60
     policy = input("Install policy [check-only/security-only/all-stable] (default check-only): ").strip() or "check-only"
+    if automatic_updates and policy == "check-only":
+        policy = "security-only"
     if policy not in {"check-only", "security-only", "all-stable"}:
         raise core.LKSUError("Invalid install policy")
     services = input("Services to verify after reboot (comma separated, optional): ").strip()
@@ -43,8 +60,10 @@ def setup():
     parsed_urls = [{"url": x.strip(), "status": 200} for x in health_urls.split(",") if x.strip()]
     core.save(core.CONFIG, {"email": email, "smtp_host": host, "smtp_port": port,
                             "smtp_user": user, "smtp_password": password, "policy": policy,
-                            "services": parsed, "health_urls": parsed_urls, "automatic_reboot": False,
-                            "maintenance_window": {"start": "03:00", "duration_minutes": 60},
+                            "services": parsed, "health_urls": parsed_urls,
+                            "automatic_updates": automatic_updates, "notifications": notifications,
+                            "automatic_reboot": automatic_reboot,
+                            "maintenance_window": {"enabled": use_window, "start": start, "duration_minutes": duration},
                             "security_watch": {"required_services": ["auditd", "firewalld"],
                                                "require_selinux_enforcing": True,
                                                "ssh_failure_threshold": 5,
@@ -100,7 +119,7 @@ def main(argv=None):
             if not in_maintenance_window(cfg):
                 result = {"status": "outside-maintenance-window"}
             else:
-                result = core.apply(cfg["policy"]) if cfg["policy"] != "check-only" else core.check()
+                result = core.apply(cfg["policy"]) if cfg.get("automatic_updates") and cfg["policy"] != "check-only" else core.check()
                 if cfg.get("automatic_reboot") and result.get("status") == "installed-awaiting-manual-reboot":
                     result["trial_boot"] = core.stage_trial_boot()
                     reboot_requested = True
@@ -119,7 +138,7 @@ def main(argv=None):
         output = json.dumps(result, indent=2)
         print(output)
         routine_reports = args.command in {"scheduled", "apply", "maintenance", "stage-reboot", "verify"}
-        if routine_reports or (args.command == "security-check" and result["alerts"]):
+        if (routine_reports and cfg.get("notifications", True)) or (args.command == "security-check" and result["alerts"]):
             send_report(cfg, f"LKSU {args.command} {datetime.now().isoformat(timespec='minutes')}", output)
         if routine_reports or args.command == "security-check":
             send_fleet_report(cfg, {"command": args.command, "result": result, "hostname": os.uname().nodename, "reported_at": int(datetime.now().timestamp())})
