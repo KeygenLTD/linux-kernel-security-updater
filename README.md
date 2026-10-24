@@ -35,6 +35,16 @@ sudo systemctl enable --now lksu.timer
 systemctl list-timers lksu.timer
 ```
 
+## One-command setup
+
+For a pinned release on AlmaLinux 8/9/10:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/KeygenLTD/linux-kernel-security-updater/v0.3.1/bootstrap.sh | sudo bash
+```
+
+This installs LKSU, asks for the report email and secure SMTP settings, then runs a read-only check and sends the first report. It does not enable automatic updates or reboot.
+
 To enable alert-only Security Watch, first review `security_watch` in the root-only configuration, create a trusted baseline, then enable its timer:
 
 ```bash
