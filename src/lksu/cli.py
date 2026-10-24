@@ -66,7 +66,7 @@ def setup():
         raise core.LKSUError("Invalid service name")
     health_urls = input("HTTP/HTTPS health URLs (comma separated, optional): ").strip()
     parsed_urls = [{"url": x.strip(), "status": 200} for x in health_urls.split(",") if x.strip()]
-    core.save(core.CONFIG, {"email": email, "smtp_host": host, "smtp_port": port,
+    core.save(core.CONFIG, {"email": email, "from_email": email, "smtp_host": host, "smtp_port": port,
                             "smtp_user": user, "smtp_password": password, "policy": policy,
                             "services": parsed, "health_urls": parsed_urls,
                             "automatic_updates": automatic_updates, "notifications": notifications,
@@ -82,7 +82,7 @@ def setup():
 def send_report(cfg, subject, body):
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"] = cfg["smtp_user"]
+    msg["From"] = cfg.get("from_email", cfg["email"])
     msg["To"] = cfg["email"]
     msg.set_content(body)
     context = ssl.create_default_context()
