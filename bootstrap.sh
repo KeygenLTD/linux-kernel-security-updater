@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-RELEASE="v0.3.7"
+RELEASE="v0.3.8"
 REPO="KeygenLTD/linux-kernel-security-updater"
 ARCHIVE="https://github.com/${REPO}/archive/refs/tags/${RELEASE}.tar.gz"
 [[ "${EUID}" -eq 0 ]] || { echo "Run with sudo" >&2; exit 1; }
@@ -10,7 +10,9 @@ tar -xzf "$tmp/lksu.tgz" -C "$tmp"
 root="$(find "$tmp" -maxdepth 1 -mindepth 1 -type d -name 'linux-kernel-security-updater-*' -print -quit)"
 [[ -n "$root" ]] || { echo "Invalid release archive" >&2; exit 1; }
 "$root/install.sh"
-if [[ -r /dev/tty ]]; then
+if [[ -s /etc/lksu/config.json ]]; then
+  echo "Mevcut LKSU yapılandırması korunuyor. Yeniden yapılandırmak için: lksu configure"
+elif [[ -r /dev/tty ]]; then
   echo "LKSU yapılandırması başlıyor."
   /usr/local/bin/lksu configure </dev/tty >/dev/tty
 else
