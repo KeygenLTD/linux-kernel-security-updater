@@ -29,6 +29,7 @@ class FleetTests(unittest.TestCase):
                 listing = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/api/v1/servers", headers={"Authorization": "Bearer dashboard"})
                 with urllib.request.urlopen(listing) as response: data = json.load(response)
                 self.assertEqual(data[0]["server_id"], "node-1")
+                self.assertFalse(data[0]["stale"])
             finally:
                 server.shutdown(); server.server_close(); thread.join(timeout=2)
 

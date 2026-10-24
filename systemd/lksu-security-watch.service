@@ -1,0 +1,14 @@
+[Unit]
+Description=LKSU lightweight security watch and alerting
+After=network-online.target auditd.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/lksu security-check
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/lksu
+

@@ -2,7 +2,7 @@
 
 ![LKSU kernel update, verification and fallback illustration](docs/assets/lksu-hero.png)
 
-> **Status: v0.2 early preview.** Unit tested, but not yet integration tested across AlmaLinux 8/9/10, BIOS/UEFI, DNF and GRUB combinations. Do not activate automatic installation or reboot on production hosts until those checks and a provider-console recovery drill pass.
+> **Status: v0.3 early preview.** Unit tested, but not yet integration tested across AlmaLinux 8/9/10, BIOS/UEFI, DNF and GRUB combinations. Do not activate automatic installation or reboot on production hosts until those checks and a provider-console recovery drill pass.
 
 Early production-oriented release for **AlmaLinux 8, 9 and 10**. LKSU uses the distribution's enabled DNF repositories. It does not enable testing repositories, select a CVE-specific build, download arbitrary RPMs, or reboot a machine automatically.
 
@@ -15,6 +15,8 @@ Early production-oriented release for **AlmaLinux 8, 9 and 10**. LKSU uses the d
 - Maintenance windows use an explicit local start time and duration. Installation and reboot are separate operations; automatic reboot defaults to disabled.
 - A trial reboot keeps the old kernel as the persistent GRUB default and selects the new kernel once with `grub2-reboot`. Successful service and HTTP/HTTPS health checks promote the new kernel.
 - Agents can send HMAC-signed reports over HTTPS to the SQLite-backed `lksu-fleet` collector and bearer-token-protected web dashboard.
+- Optional Security Watch reports LKSU/config integrity changes, inactive configured security services, non-enforcing SELinux, repeated SSH failures and successful root SSH logins. It never edits files, blocks addresses or removes users.
+- The fleet dashboard marks a server silent/stale when its signed heartbeat is older than the configured threshold.
 - `lksu select-old` selects the previous kernel as the default for the **next** boot and verifies GRUB's selection. It does not cause a reboot or guarantee recovery from an unbootable machine. A failed boot may require a provider console and manual GRUB selection. Keep a current provider snapshot and console access.
 - A pending update blocks a second install until successful post-boot verification. Failed verification leaves the pending state and requires investigation.
 
@@ -32,6 +34,16 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now lksu.timer
 systemctl list-timers lksu.timer
 ```
+
+To enable alert-only Security Watch, first review `security_watch` in the root-only configuration, create a trusted baseline, then enable its timer:
+
+```bash
+sudo lksu security-baseline
+sudo lksu security-check
+sudo systemctl enable --now lksu-security-watch.timer
+```
+
+Re-run `security-baseline` only after verifying that an intentional LKSU or watched-file change is trusted. Security Watch does not attempt malware removal or general system rollback; use auditd, AIDE, Wazuh, CrowdSec or another dedicated security platform where appropriate.
 
 The interactive setup requests a report address, SMTP host/port, username, password or app password, policy, and health-check service names. Configuration is written to `/etc/lksu/config.json` as mode 0600. Use a dedicated SMTP credential. Port 465 uses implicit TLS; other ports require STARTTLS and certificate verification. Avoid shared administrator account credentials. Test mail delivery with `sudo lksu scheduled` before relying on alerts.
 

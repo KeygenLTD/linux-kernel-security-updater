@@ -37,7 +37,7 @@ def init_db(path):
     return db
 
 
-def handler_factory(db_path, secrets, dashboard_token):
+def handler_factory(db_path, secrets, dashboard_token, stale_after_seconds=900):
     class Handler(BaseHTTPRequestHandler):
         server_version = "LKSUFleet/0.2"
 
@@ -79,10 +79,11 @@ def handler_factory(db_path, secrets, dashboard_token):
 <style>body{font:16px system-ui;background:#08131f;color:#d9e8f5;max-width:1100px;margin:40px auto;padding:20px}input,button{padding:10px;margin:4px;background:#12263a;color:white;border:1px solid #285274;border-radius:7px}table{width:100%;border-collapse:collapse;margin-top:20px}td,th{padding:10px;border-bottom:1px solid #24445e;text-align:left}.ok{color:#55dc8a}.bad{color:#ffb45e}</style>
 <h1>LKSU Fleet</h1><p>Enter the dashboard token. It stays in this browser tab and is sent only as an Authorization header.</p>
 <input id=t type=password autocomplete=off><button onclick=load()>Refresh</button><div id=s></div>
-<script>async function load(){let r=await fetch('/api/v1/servers',{headers:{Authorization:'Bearer '+document.querySelector('#t').value}});if(!r.ok){s.textContent='Unauthorized';return}let d=await r.json();s.innerHTML='<table><tr><th>Server</th><th>Last report</th><th>Command</th><th>Status</th></tr>'+d.map(x=>`<tr><td>${esc(x.server_id)}</td><td>${new Date(x.received_at*1000).toLocaleString()}</td><td>${esc(x.report.command||'')}</td><td class=${x.report.result?.healthy===false?'bad':'ok'}>${esc(x.report.result?.status||String(x.report.result?.healthy??''))}</td></tr>`).join('')+'</table>'}function esc(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</script>""")
+<script>async function load(){let r=await fetch('/api/v1/servers',{headers:{Authorization:'Bearer '+document.querySelector('#t').value}});if(!r.ok){s.textContent='Unauthorized';return}let d=await r.json();s.innerHTML='<table><tr><th>Server</th><th>Last report</th><th>Command</th><th>Status</th></tr>'+d.map(x=>`<tr><td>${esc(x.server_id)}</td><td>${new Date(x.received_at*1000).toLocaleString()}</td><td>${esc(x.report.command||'')}</td><td class=${x.stale||x.report.result?.status==='alert'||x.report.result?.healthy===false?'bad':'ok'}>${x.stale?'SILENT / STALE':esc(x.report.result?.status||String(x.report.result?.healthy??''))}</td></tr>`).join('')+'</table>'}function esc(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</script>""")
             if self.path != "/api/v1/servers" or not self.authorized_dashboard(): return self.send_json(401, {"error": "unauthorized"})
             with closing(init_db(db_path)) as db:
-                rows = [{"server_id": row[0], "received_at": row[1], "report": json.loads(row[2])} for row in db.execute("SELECT server_id,received_at,payload FROM reports ORDER BY server_id")]
+                now = int(time.time())
+                rows = [{"server_id": row[0], "received_at": row[1], "stale": now - row[1] > stale_after_seconds, "report": json.loads(row[2])} for row in db.execute("SELECT server_id,received_at,payload FROM reports ORDER BY server_id")]
             self.send_json(200, rows)
 
         def log_message(self, fmt, *args):
@@ -97,7 +98,7 @@ def main(argv=None):
     bind = config.get("bind", "127.0.0.1"); port = int(config.get("port", 9443))
     if bind not in {"127.0.0.1", "::1", "localhost"} and not (config.get("tls_cert") and config.get("tls_key")):
         raise SystemExit("TLS certificate and key are required for a non-loopback bind")
-    server = ThreadingHTTPServer((bind, port), handler_factory(config["database"], config["servers"], config["dashboard_token"]))
+    server = ThreadingHTTPServer((bind, port), handler_factory(config["database"], config["servers"], config["dashboard_token"], int(config.get("stale_after_seconds", 900))))
     if config.get("tls_cert"):
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER); context.load_cert_chain(config["tls_cert"], config["tls_key"])
         server.socket = context.wrap_socket(server.socket, server_side=True)

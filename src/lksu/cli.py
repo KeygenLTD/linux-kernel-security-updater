@@ -12,6 +12,7 @@ from email.message import EmailMessage
 from . import core
 from .fleet import send_report as send_fleet_report
 from .policy import in_maintenance_window
+from .security import check as security_check, create_baseline
 
 
 def setup():
@@ -43,7 +44,11 @@ def setup():
     core.save(core.CONFIG, {"email": email, "smtp_host": host, "smtp_port": port,
                             "smtp_user": user, "smtp_password": password, "policy": policy,
                             "services": parsed, "health_urls": parsed_urls, "automatic_reboot": False,
-                            "maintenance_window": {"start": "03:00", "duration_minutes": 60}})
+                            "maintenance_window": {"start": "03:00", "duration_minutes": 60},
+                            "security_watch": {"required_services": ["auditd", "firewalld"],
+                                               "require_selinux_enforcing": True,
+                                               "ssh_failure_threshold": 5,
+                                               "watched_files": ["/etc/ssh/sshd_config", "/etc/sudoers"]}})
     print("Configuration saved; automatic reboot is disabled.")
 
 
@@ -69,7 +74,7 @@ def send_report(cfg, subject, body):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="AlmaLinux Kernel Security Updater")
-    parser.add_argument("command", choices=("configure", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old"))
+    parser.add_argument("command", choices=("configure", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check"))
     args = parser.parse_args(argv)
     reboot_requested = False
     try:
@@ -77,7 +82,13 @@ def main(argv=None):
             setup()
             return 0
         cfg = core.config()
-        if args.command == "check":
+        if args.command == "security-baseline":
+            if os.geteuid(): raise core.LKSUError("Root required")
+            result = {"status": "baseline-created", "baseline": create_baseline(cfg)}
+        elif args.command == "security-check":
+            if os.geteuid(): raise core.LKSUError("Root required")
+            result = security_check(cfg)
+        elif args.command == "check":
             result = core.check()
         elif args.command == "apply":
             if os.geteuid():
@@ -107,8 +118,10 @@ def main(argv=None):
             result = {"old_default": core.select_old(), "rebooted": False}
         output = json.dumps(result, indent=2)
         print(output)
-        if args.command in {"scheduled", "apply", "maintenance", "stage-reboot", "verify"}:
+        routine_reports = args.command in {"scheduled", "apply", "maintenance", "stage-reboot", "verify"}
+        if routine_reports or (args.command == "security-check" and result["alerts"]):
             send_report(cfg, f"LKSU {args.command} {datetime.now().isoformat(timespec='minutes')}", output)
+        if routine_reports or args.command == "security-check":
             send_fleet_report(cfg, {"command": args.command, "result": result, "hostname": os.uname().nodename, "reported_at": int(datetime.now().timestamp())})
         if reboot_requested:
             core.run("systemctl", "reboot")

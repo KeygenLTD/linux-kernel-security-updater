@@ -157,6 +157,8 @@ def verify(cfg):
         state["pending"] = False
         state["last_known_good"] = running
         save(STATE, state)
+    else:
+        report["recommended_action"] = "Investigate failed checks. If rollback is required, confirm provider console access, run 'lksu select-old', verify grubby --default-kernel, then reboot in an approved window."
     return report
 
 

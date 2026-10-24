@@ -1,5 +1,5 @@
 Name:           lksu
-Version:        0.2.0
+Version:        0.3.0
 Release:        1%{?dist}
 Summary:        Conservative AlmaLinux kernel security updater
 License:        MIT
@@ -26,6 +26,8 @@ install -D -m 0644 systemd/lksu.timer %{buildroot}%{_unitdir}/lksu.timer
 install -D -m 0644 systemd/lksu-maintenance.service %{buildroot}%{_unitdir}/lksu-maintenance.service
 install -D -m 0644 systemd/lksu-maintenance.timer %{buildroot}%{_unitdir}/lksu-maintenance.timer
 install -D -m 0644 systemd/lksu-verify.service %{buildroot}%{_unitdir}/lksu-verify.service
+install -D -m 0644 systemd/lksu-security-watch.service %{buildroot}%{_unitdir}/lksu-security-watch.service
+install -D -m 0644 systemd/lksu-security-watch.timer %{buildroot}%{_unitdir}/lksu-security-watch.timer
 
 %files
 %license LICENSE
@@ -37,5 +39,8 @@ install -D -m 0644 systemd/lksu-verify.service %{buildroot}%{_unitdir}/lksu-veri
 %{_unitdir}/lksu*.timer
 
 %changelog
+* Sun Oct 25 2026 LKSU contributors - 0.3.0-1
+- Add alert-only Security Watch and stale fleet detection
+
 * Sun Oct 25 2026 LKSU contributors - 0.2.0-1
 - Initial RPM packaging preview

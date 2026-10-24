@@ -11,6 +11,8 @@ install -D -m 0644 systemd/lksu.timer /etc/systemd/system/lksu.timer
 install -D -m 0644 systemd/lksu-maintenance.service /etc/systemd/system/lksu-maintenance.service
 install -D -m 0644 systemd/lksu-maintenance.timer /etc/systemd/system/lksu-maintenance.timer
 install -D -m 0644 systemd/lksu-verify.service /etc/systemd/system/lksu-verify.service
+install -D -m 0644 systemd/lksu-security-watch.service /etc/systemd/system/lksu-security-watch.service
+install -D -m 0644 systemd/lksu-security-watch.timer /etc/systemd/system/lksu-security-watch.timer
 systemctl daemon-reload
 echo "Installed. Run: lksu configure"
 echo "No timer, automatic installation, or reboot was enabled."
