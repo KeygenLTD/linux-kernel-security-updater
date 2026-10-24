@@ -76,7 +76,7 @@ def setup():
                                                "require_selinux_enforcing": True,
                                                "ssh_failure_threshold": 5,
                                                "watched_files": ["/etc/ssh/sshd_config", "/etc/sudoers"]}})
-    print("Configuration saved; automatic reboot is disabled.")
+    print(f"Configuration saved; automatic reboot is {'enabled' if automatic_reboot else 'disabled'}.")
 
 
 def send_report(cfg, subject, body):
