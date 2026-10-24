@@ -40,7 +40,7 @@ systemctl list-timers lksu.timer
 For a pinned release on AlmaLinux 8/9/10:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/KeygenLTD/linux-kernel-security-updater/v0.3.9/bootstrap.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/KeygenLTD/linux-kernel-security-updater/v0.3.10/bootstrap.sh | sudo bash
 ```
 
 This installs LKSU, asks for the report email and provider settings, then runs a read-only check and sends the first report. It does not enable automatic updates or reboot unless explicitly selected.

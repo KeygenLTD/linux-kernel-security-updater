@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-RELEASE="v0.3.9"
+RELEASE="v0.3.10"
 REPO="KeygenLTD/linux-kernel-security-updater"
 ARCHIVE="https://github.com/${REPO}/archive/refs/tags/${RELEASE}.tar.gz"
 [[ "${EUID}" -eq 0 ]] || { echo "Run with sudo" >&2; exit 1; }
@@ -19,7 +19,6 @@ else
   echo "Interactive terminal is required for LKSU configuration." >&2
   exit 1
 fi
-/usr/local/bin/lksu check
 /usr/local/bin/lksu scheduled
 
 echo "LKSU ilk kontrol tamamlandı; seçilen otomasyonlar etkinleştiriliyor."

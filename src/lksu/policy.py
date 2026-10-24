@@ -13,25 +13,31 @@ def security_advisories():
     if result.returncode not in (0, 100):
         raise LKSUError(f"DNF updateinfo failed: {result.stderr.strip()[:500]}")
     found = {}
-    warnings = []
+    warning = None
     for raw in result.stdout.splitlines():
         match = ADVISORY.match(raw.strip())
         if not match:
             continue
         advisory_id = match.group("id")
-        try:
-            detail = run("dnf", "-q", "updateinfo", "info", advisory_id, check=False, timeout=20)
-            if detail.returncode:
-                raise LKSUError(f"Could not read advisory {advisory_id}")
-            cves = sorted(set(x.upper() for x in CVE.findall(detail.stdout)))
-        except LKSUError as exc:
-            warnings.append(f"{advisory_id}: advisory detail unavailable ({exc})")
-            cves = []
-        found.setdefault(advisory_id, {"id": advisory_id, "severity": match.group("severity"), "packages": [], "cves": cves})
+        found.setdefault(advisory_id, {"id": advisory_id, "severity": match.group("severity"), "packages": [], "cves": []})
         found[advisory_id]["packages"].append(match.group("package"))
+    if found:
+        try:
+            detail = run("dnf", "-q", "updateinfo", "info", "--security", "--available", "kernel*", check=False, timeout=20)
+            if detail.returncode not in (0, 100):
+                raise LKSUError("Could not read advisory details")
+            blocks = re.split(r"(?=Update ID\s*:\s*)", detail.stdout, flags=re.I)
+            for block in blocks:
+                update_id = re.search(r"Update ID\s*:\s*(\S+)", block, re.I)
+                if update_id and update_id.group(1) in found:
+                    found[update_id.group(1)]["cves"] = sorted(set(x.upper() for x in CVE.findall(block)))
+            if len(found) == 1 and not any(item["cves"] for item in found.values()):
+                next(iter(found.values()))["cves"] = sorted(set(x.upper() for x in CVE.findall(detail.stdout)))
+        except LKSUError as exc:
+            warning = f"Advisory details unavailable: {exc}"
     result = sorted(found.values(), key=lambda item: item["id"])
-    if warnings:
-        result.append({"warnings": warnings})
+    if warning:
+        result.append({"warning": warning})
     return result
 
 
