@@ -17,8 +17,11 @@ class LKSUError(RuntimeError):
     pass
 
 
-def run(*args, check=True):
-    p = subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+def run(*args, check=True, timeout=120):
+    try:
+        p = subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        raise LKSUError(f"{args[0]} timed out after {timeout}s; repository or network did not respond") from exc
     if check and p.returncode:
         raise LKSUError(f"{args[0]} exited {p.returncode}: {p.stderr.strip()[:500]}")
     return p
