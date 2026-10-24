@@ -22,16 +22,20 @@ def setup():
     email = input("Report email: ").strip()
     if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
         raise core.LKSUError("Invalid email address")
-    host = input("SMTP host: ").strip()
-    if not re.fullmatch(r"[A-Za-z0-9.-]+", host):
-        raise core.LKSUError("Invalid SMTP host")
-    port = int(input("SMTP port [465]: ").strip() or "465")
-    if port < 1 or port > 65535:
-        raise core.LKSUError("Invalid port")
-    user = input("SMTP username: ").strip()
-    password = getpass.getpass("SMTP password or app password: ")
-    if not user or not password:
-        raise core.LKSUError("SMTP authentication is required")
+    provider = input("Mail provider [postmark/custom] (default postmark): ").strip().lower() or "postmark"
+    if provider == "postmark":
+        host, port = "smtp.postmarkapp.com", 587
+        token = getpass.getpass("Postmark Server Token: ")
+        user = password = token
+    elif provider == "custom":
+        host = input("SMTP host: ").strip()
+        port = int(input("SMTP port [465]: ").strip() or "465")
+        user = input("SMTP username: ").strip()
+        password = getpass.getpass("SMTP password or app password: ")
+    else:
+        raise core.LKSUError("Invalid mail provider")
+    if not user or not password or not re.fullmatch(r"[A-Za-z0-9.-]+", host):
+        raise core.LKSUError("Invalid mail configuration")
     def yes_no(prompt, default):
         suffix = "Y/n" if default else "y/N"
         value = input(f"{prompt} [{suffix}]: ").strip().lower()
