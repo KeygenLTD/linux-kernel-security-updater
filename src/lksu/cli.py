@@ -22,11 +22,15 @@ def setup():
     email = input("Report email: ").strip()
     if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
         raise core.LKSUError("Invalid email address")
-    provider = input("Mail provider [postmark/custom] (default postmark): ").strip().lower() or "postmark"
+    provider = input("Mail provider [postmark/smtp2go/custom] (default postmark): ").strip().lower() or "postmark"
     if provider == "postmark":
         host, port = "smtp.postmarkapp.com", 587
         token = getpass.getpass("Postmark Server Token: ")
         user = password = token
+    elif provider == "smtp2go":
+        host, port = "mail.smtp2go.com", 587
+        user = input("SMTP2GO username: ").strip()
+        password = getpass.getpass("SMTP2GO password: ")
     elif provider == "custom":
         host = input("SMTP host: ").strip()
         port = int(input("SMTP port [465]: ").strip() or "465")
