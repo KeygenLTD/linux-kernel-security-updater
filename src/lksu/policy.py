@@ -13,18 +13,26 @@ def security_advisories():
     if result.returncode not in (0, 100):
         raise LKSUError(f"DNF updateinfo failed: {result.stderr.strip()[:500]}")
     found = {}
+    warnings = []
     for raw in result.stdout.splitlines():
         match = ADVISORY.match(raw.strip())
         if not match:
             continue
         advisory_id = match.group("id")
-        detail = run("dnf", "-q", "updateinfo", "info", advisory_id, check=False)
-        if detail.returncode:
-            raise LKSUError(f"Could not read advisory {advisory_id}")
-        cves = sorted(set(x.upper() for x in CVE.findall(detail.stdout)))
+        try:
+            detail = run("dnf", "-q", "updateinfo", "info", advisory_id, check=False, timeout=20)
+            if detail.returncode:
+                raise LKSUError(f"Could not read advisory {advisory_id}")
+            cves = sorted(set(x.upper() for x in CVE.findall(detail.stdout)))
+        except LKSUError as exc:
+            warnings.append(f"{advisory_id}: advisory detail unavailable ({exc})")
+            cves = []
         found.setdefault(advisory_id, {"id": advisory_id, "severity": match.group("severity"), "packages": [], "cves": cves})
         found[advisory_id]["packages"].append(match.group("package"))
-    return sorted(found.values(), key=lambda item: item["id"])
+    result = sorted(found.values(), key=lambda item: item["id"])
+    if warnings:
+        result.append({"warnings": warnings})
+    return result
 
 
 def in_maintenance_window(config, now=None):
