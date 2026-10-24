@@ -1,0 +1,12 @@
+[Unit]
+Description=Check and optionally install AlmaLinux kernel updates
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/lksu scheduled
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+

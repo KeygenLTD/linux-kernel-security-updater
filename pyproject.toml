@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lksu"
+version = "0.1.0"
+description = "Conservative AlmaLinux kernel update orchestration"
+requires-python = ">=3.9"
+
+[project.scripts]
+lksu = "lksu.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
