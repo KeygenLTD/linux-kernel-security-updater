@@ -22,7 +22,7 @@ Early production-oriented release for **AlmaLinux 8, 9 and 10**. LKSU uses the d
 
 ## Install on a test VM first
 
-Requires Python 3.9+, DNF, RPM, grubby, systemd, and a configured SMTP service with TLS. On the host, from this directory:
+The recommended path is the one-command installer below. Manual installation is available for operators who want to inspect each step. LKSU supports Postmark, SMTP2GO, custom SMTP, local mail, or no email.
 
 ```bash
 sudo dnf install -y python3 python3-pip grubby
@@ -40,10 +40,27 @@ systemctl list-timers lksu.timer
 For a pinned release on AlmaLinux 8/9/10:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/KeygenLTD/linux-kernel-security-updater/v0.3.5/bootstrap.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/KeygenLTD/linux-kernel-security-updater/v0.3.6/bootstrap.sh | sudo bash
 ```
 
-This installs LKSU, asks for the report email and secure SMTP settings, then runs a read-only check and sends the first report. It does not enable automatic updates or reboot.
+This installs LKSU, asks for the report email and provider settings, then runs a read-only check and sends the first report. It does not enable automatic updates or reboot unless explicitly selected.
+
+## Manual operations
+
+```bash
+sudo /usr/local/bin/lksu configure
+sudo /usr/local/bin/lksu check
+sudo /usr/local/bin/lksu scheduled
+sudo /usr/local/bin/lksu apply
+sudo /usr/local/bin/lksu maintenance
+sudo /usr/local/bin/lksu stage-reboot
+sudo /usr/local/bin/lksu verify
+sudo /usr/local/bin/lksu select-old
+sudo /usr/local/bin/lksu security-baseline
+sudo /usr/local/bin/lksu security-check
+```
+
+`check` and `scheduled` are read-only. `apply` installs the configured kernel policy. `stage-reboot` prepares a one-shot trial boot; it does not guarantee recovery from an unbootable host. `verify` checks the running kernel and configured health checks. `select-old` selects the preserved previous kernel for the next boot.
 
 To enable alert-only Security Watch, first review `security_watch` in the root-only configuration, create a trusted baseline, then enable its timer:
 
