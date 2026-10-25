@@ -50,7 +50,7 @@ def detect_active_host_services():
         if not fields:
             continue
         unit = fields[0].lstrip("●")
-        if not re.fullmatch(r"[A-Za-z0-9_.@-]+\\.service", unit):
+        if not re.fullmatch(r"[A-Za-z0-9_.@-]+\.service", unit):
             continue
         name = unit[:-len(".service")]
         if (name.lower() in os_services
