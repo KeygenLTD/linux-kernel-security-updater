@@ -2,7 +2,7 @@
 
 ![LKSU kernel update, verification and fallback illustration](docs/assets/lksu-hero.png)
 
-> **Status: v0.3.14 early preview.** Unit tested, but not yet integration tested across AlmaLinux 8/9/10, BIOS/UEFI, DNF and GRUB combinations. Do not activate automatic installation or reboot on production hosts until those checks and a provider-console recovery drill pass.
+> **Status: v0.3.15 early preview.** Unit tested, but not yet integration tested across AlmaLinux 8/9/10, BIOS/UEFI, DNF and GRUB combinations. Do not activate automatic installation or reboot on production hosts until those checks and a provider-console recovery drill pass.
 
 Early production-oriented release for **AlmaLinux 8, 9 and 10**. LKSU uses the distribution's enabled DNF repositories. It does not enable testing repositories, select a CVE-specific build, or download arbitrary RPMs. It requests automatic reboot only after opt-in and safety checks.
 
@@ -37,10 +37,10 @@ systemctl list-timers lksu.timer
 
 ## One-command setup (recommended)
 
-For a pinned GitHub release on AlmaLinux 8/9/10 (after the v0.3.14 release is published):
+For a pinned GitHub release on AlmaLinux 8/9/10 (after the v0.3.15 release is published):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/KeygenLTD/linux-kernel-security-updater/v0.3.14/bootstrap.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/KeygenLTD/linux-kernel-security-updater/v0.3.15/bootstrap.sh | sudo bash
 ```
 
 This installs LKSU, asks for the report email and provider settings, configures timers, and immediately attempts an eligible kernel installation if automatic updates are selected. A trial reboot can occur when explicitly enabled and after every recovery and health gate passes.
@@ -83,7 +83,13 @@ For a **new installation**, the interactive `lksu configure` setup asks whether 
 
 `sudo lksu configure-self-update` changes just that self-update preference, avoiding the need to enter mail credentials again. The installer provisions the daily self-update timer automatically. A new release must still be published as a GitHub Release wheel, pass digest checks, and have a version newer than the one running before it can be activated. LKSU kernel auto-install and reboot settings remain separate.
 
-## Event-only email notifications (v0.3.14)
+## System RPM bindings and automatic boot adoption (v0.3.15)
+
+LKSU runs from a versioned Python virtual environment. AlmaLinux's `python3-rpm` native bindings are not installed into that environment, so the kernel version comparator calls **`/usr/bin/python3`**, where the OS package supplies native RPM EVR ordering. Do not install RPM bindings into LKSU's venv or use string comparison as a substitute. On the host, diagnose the binding using `/usr/bin/python3 -c 'import rpm; print("RPM OK")'`. The venv's `import rpm` may fail normally.
+
+When automatic reboot is selected, the configuration wizard now detects running `lsws`, `mariadb` and `lscpd` CyberPanel services as default health checks. If no health checks can be established, it refuses to save an unsafe reboot configuration. Changing automation also immediately enables/disables the maintenance timer to reflect the saved schedule. An update or reboot still requires an approved maintenance window and real snapshot/provider console readiness; an existing kernel can only be adopted after safe RPM/GRUB checks. Automatic trial reboot and post-boot verification continue unattended when all prerequisites pass. LKSU does not promise unattended recovery from a completely unbootable machine.
+
+## Event-only email notifications (v0.3.15)
 
 LKSU checks and maintenance-window skips run **silently**: no email for successful read-only scans, no RPM upgrades, no self-update available, or unchanged software releases. Emails are sent only after an actual kernel installation, a staged kernel transition, successful post-reboot verification, a real LKSU application upgrade, an attempted installation/reboot error, or a failed verification. Repeated identical failures and updates are deduplicated using persistent `/var/lib/lksu/notifications.json` state; logs and fleet telemetry remain available. If SMTP fails, LKSU does not mark the message delivered and can retry on a later matching event. A server which cannot boot or has lost internet cannot send its own alert: use independent provider monitoring for that case.
 
