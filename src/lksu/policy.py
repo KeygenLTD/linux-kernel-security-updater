@@ -45,7 +45,7 @@ def in_maintenance_window(config, now=None):
     window = config.get("maintenance_window")
     # An explicitly disabled time restriction permits 24/7 maintenance.
     # Missing/malformed configuration must not accidentally authorize reboot.
-    if not isinstance(window, dict):
+    if not isinstance(window, dict) or not window:
         return False
     if window.get("enabled", True) is False:
         return True
