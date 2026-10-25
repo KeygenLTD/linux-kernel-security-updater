@@ -59,9 +59,12 @@ def setup():
     use_window = yes_no("Use a maintenance window for future kernel installations?", automatic_updates or automatic_reboot)
     start = input("Maintenance start [03:00]: ").strip() or "03:00" if use_window else "03:00"
     duration = int(input("Maintenance duration in minutes [60]: ").strip() or "60") if use_window else 60
-    policy = input("Install policy [check-only/security-only/all-stable] (default check-only): ").strip() or "check-only"
+    default_policy = "all-stable" if automatic_updates else "check-only"
+    policy = input(
+        f"Install policy [check-only/security-only/all-stable] (default {default_policy}): "
+    ).strip() or default_policy
     if automatic_updates and policy == "check-only":
-        policy = "security-only"
+        raise core.LKSUError("Automatic kernel installation requires security-only or all-stable")
     if policy not in {"check-only", "security-only", "all-stable"}:
         raise core.LKSUError("Invalid install policy")
     services = input("Services to verify after reboot (comma separated, optional): ").strip()
@@ -106,7 +109,10 @@ def configure_automation():
     cfg["automatic_reboot"] = reboot
     cfg["maintenance_window"] = {"enabled": enabled, "start": start, "duration_minutes": duration}
     if update and cfg.get("policy") == "check-only":
-        cfg["policy"] = "security-only"
+        policy = input("Kernel install policy [security-only/all-stable] (default all-stable): ").strip() or "all-stable"
+        if policy not in {"security-only", "all-stable"}:
+            raise core.LKSUError("Invalid install policy")
+        cfg["policy"] = policy
     if reboot:
         if not cfg.get("services") and not cfg.get("health_urls"):
             names = input("Services to check before and after reboot (comma separated): ").strip()
