@@ -104,13 +104,14 @@ class ConsoleTests(unittest.TestCase):
 
 
 
+    @patch("lksu.cli.detect_active_host_services", return_value=["docker", "nginx", "postgresql"])
     @patch("lksu.cli.core.run")
     @patch("lksu.cli.core.save")
     @patch("lksu.cli.core.config")
     @patch("lksu.cli.os.geteuid", return_value=0)
     @patch("builtins.input")
     def test_automation_offers_active_service_defaults_and_enables_timer(
-        self, prompt, _root, config, save, run
+        self, prompt, _root, config, save, run, discover
     ):
         data = dict(CFG)
         data["services"] = []
@@ -126,20 +127,22 @@ class ConsoleTests(unittest.TestCase):
         run.return_value.returncode = 0
         with contextlib.redirect_stdout(io.StringIO()):
             cli.configure_automation()
-        self.assertEqual(save.call_args.args[1]["services"], ["lsws", "mariadb", "lscpd"])
+        discover.assert_called_once_with()
+        self.assertEqual(save.call_args.args[1]["services"], ["docker", "nginx", "postgresql"])
         self.assertTrue(save.call_args.args[1]["automatic_reboot"])
         self.assertIn(
             ("systemctl", "enable", "--now", "lksu-maintenance.timer"),
             [call.args for call in run.call_args_list],
         )
 
+    @patch("lksu.cli.detect_active_host_services", return_value=[])
     @patch("lksu.cli.core.run")
     @patch("lksu.cli.core.save")
     @patch("lksu.cli.core.config")
     @patch("lksu.cli.os.geteuid", return_value=0)
     @patch("builtins.input", return_value="")
     def test_automation_refuses_no_health_checks(
-        self, _input, _root, config, save, run
+        self, _input, _root, config, save, run, discover
     ):
         data = dict(CFG)
         data["services"] = []
@@ -150,6 +153,72 @@ class ConsoleTests(unittest.TestCase):
         with self.assertRaisesRegex(core.LKSUError, "requires at least one"):
             cli.configure_automation()
         save.assert_not_called()
+
+
+    @patch("lksu.cli.core.run")
+    def test_auto_discovers_generic_services_not_just_web_panels(self, run):
+        units = (
+            "nginx.service loaded active running Web server\n"
+            "postgresql.service loaded active running Database\n"
+            "docker.service loaded active running Containers\n"
+            "custom-backend.service loaded active running Custom backend\n"
+            "lsws.service loaded active running Web server\n"
+            "sshd.service loaded active running SSH server\n"
+            "systemd-journald.service loaded active running Journal\n"
+            "lksu-verify.service loaded active running Kernel verifier\n"
+            "dbus-broker.service loaded active running DBus\n"
+        )
+        def reply(*args, **kwargs):
+            response = type("Result", (), {})()
+            response.returncode = 0
+            if args[1] == "list-units":
+                response.stdout = units
+            else:
+                self.assertEqual(args[1], "is-enabled")
+                response.stdout = "enabled\n"
+            return response
+        run.side_effect = reply
+        found = cli.detect_active_host_services()
+        self.assertEqual(found, ["custom-backend", "docker", "lsws", "nginx", "postgresql"])
+        self.assertNotIn("sshd", found)
+        self.assertNotIn("systemd-journald", found)
+        self.assertNotIn("lksu-verify", found)
+
+    @patch("lksu.cli.core.run")
+    def test_auto_discovers_only_enabled_running_services(self, run):
+        def reply(*args, **kwargs):
+            response = type("Result", (), {})()
+            response.returncode = 0
+            if args[1] == "list-units":
+                response.stdout = (
+                    "nginx.service loaded active running Web server\n"
+                    "custom-worker.service loaded active running Worker\n"
+                )
+            elif args[-1] == "custom-worker.service":
+                response.stdout = "disabled\n"
+                response.returncode = 1
+            else:
+                response.stdout = "enabled\n"
+            return response
+        run.side_effect = reply
+        self.assertEqual(cli.detect_active_host_services(), ["nginx"])
+
+    @patch("lksu.cli.detect_active_host_services", return_value=[])
+    @patch("lksu.cli.core.run")
+    @patch("lksu.cli.core.save")
+    @patch("lksu.cli.core.config")
+    @patch("lksu.cli.os.geteuid", return_value=0)
+    @patch("builtins.input")
+    def test_custom_service_works_without_known_panel(
+        self, prompt, _root, config, save, run, discover
+    ):
+        data = dict(CFG)
+        data.update({"services": [], "health_urls": [], "automatic_reboot": True, "recovery_ready": True})
+        config.return_value = data
+        prompt.side_effect = lambda label: "my-worker" if label.startswith("Services to check") else ""
+        with contextlib.redirect_stdout(io.StringIO()):
+            cli.configure_automation()
+        self.assertEqual(save.call_args.args[1]["services"], ["my-worker"])
 
 
 if __name__ == "__main__":
