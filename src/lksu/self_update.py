@@ -112,8 +112,11 @@ def _cmd(*args):
     # Explicitly discard environment hooks that could inject Python modules,
     # shared libraries or alternative binaries into a root-run release check.
     env = os.environ.copy()
-    for key in ("PYTHONPATH", "PYTHONHOME", "LD_PRELOAD", "LD_LIBRARY_PATH", "BASH_ENV", "ENV", "PIP_CONFIG_FILE"):
+    for key in ("PYTHONPATH", "PYTHONHOME", "LD_PRELOAD", "LD_LIBRARY_PATH", "BASH_ENV", "ENV"):
         env.pop(key, None)
+    for key in list(env):
+        if key.startswith("PIP_") or key.startswith("PYTHON"):
+            env.pop(key, None)
     env["PATH"] = "/usr/sbin:/usr/bin:/sbin:/bin"
     try:
         p = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -231,7 +234,10 @@ def update(*, automatic=False, enabled=False):
             # cannot safely be moved after pip generates them.
             candidate = target
             try:
-                venv.EnvBuilder(with_pip=True, clear=False).create(str(candidate))
+                # Avoid venv.EnvBuilder's implicit subprocess with inherited
+                # Python environment; ensurepip runs through sanitized _cmd.
+                venv.EnvBuilder(with_pip=False, clear=False).create(str(candidate))
+                _cmd(str(candidate / "bin" / "python"), "-m", "ensurepip", "--upgrade")
                 _cmd(str(candidate / "bin" / "python"), "-m", "pip", "install",
                      "--no-index", "--no-deps", "--disable-pip-version-check", str(wheel))
                 observed = _cmd(str(candidate / "bin" / "python"), "-c",
