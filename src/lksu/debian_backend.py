@@ -200,6 +200,20 @@ def verify_managed(state_path, running_release, healthy):
     target = state["new_default"].removeprefix("/boot/vmlinuz-")
     success = bool(healthy) and running_release == target
     if success:
+        # A successful trial must become the persistent default; otherwise
+        # GRUB will boot the previous kernel again on the following reboot.
+        entry = state.get("trial_entry")
+        if not entry:
+            raise DebianKernelError("No recorded trial GRUB entry to promote")
+        try:
+            promoted = subprocess.run(["grub-set-default", entry], check=False, timeout=30)
+            current = subprocess.run(["grub-editenv", "list"], capture_output=True,
+                                     text=True, check=False, timeout=30)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise DebianKernelError("Cannot promote verified kernel in GRUB") from exc
+        if promoted.returncode or current.returncode or (
+                "saved_entry=" + entry) not in current.stdout.splitlines():
+            raise DebianKernelError("Verified kernel was not confirmed as GRUB default")
         state["pending"] = False
         state["last_known_good"] = running_release
         save(state_path, state)
