@@ -5,19 +5,40 @@
   "smtp_user": "lksu@example.com",
   "smtp_password": "REPLACE_WITH_DEDICATED_APP_PASSWORD",
   "policy": "check-only",
-  "services": ["sshd"],
-  "health_urls": [{"url": "https://example.com/health", "status": 200}],
-  "maintenance_window": {"start": "03:00", "duration_minutes": 60},
+  "services": [
+    "sshd"
+  ],
+  "health_urls": [
+    {
+      "url": "https://example.com/health",
+      "status": 200
+    }
+  ],
+  "maintenance_window": {
+    "enabled": false,
+    "start": "03:00",
+    "duration_minutes": 60
+  },
   "automatic_reboot": false,
   "security_watch": {
-    "required_services": ["auditd", "firewalld"],
+    "required_services": [
+      "auditd",
+      "firewalld"
+    ],
     "require_selinux_enforcing": true,
     "ssh_failure_threshold": 5,
-    "watched_files": ["/etc/ssh/sshd_config", "/etc/sudoers"]
+    "watched_files": [
+      "/etc/ssh/sshd_config",
+      "/etc/sudoers"
+    ]
   },
   "fleet": {
     "url": "https://fleet.example.com:9443",
     "server_id": "server-01",
     "secret": "REPLACE_WITH_A_UNIQUE_RANDOM_SECRET"
-  }
+  },
+  "recovery_ready": false,
+  "automatic_lksu_updates": false,
+  "automatic_updates": false,
+  "notifications": true
 }
