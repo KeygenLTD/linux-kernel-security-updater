@@ -73,7 +73,7 @@ class InitialInstallTests(unittest.TestCase):
         with contextlib.redirect_stdout(buffer):
             self.assertEqual(cli.main(["initialize"]), 0)
         initial.assert_called_once()
-        self.assertIn("Kernel package", buffer.getvalue())
+        self.assertIn("Package upgrades:", buffer.getvalue())
         send.assert_called_once()
         fleet.assert_called_once()
 
