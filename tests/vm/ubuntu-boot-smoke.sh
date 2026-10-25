@@ -73,7 +73,7 @@ if [[ "${KERNEL_UPGRADE_TEST:-0}" == 1 ]]; then
     > guest-package-install.log 2>&1 || { tail -60 guest-package-install.log; exit 1; }
   ssh "${ssh_opts[@]}" lksutest@127.0.0.1 'sudo dpkg-query -W -f="${Status} ${Version}\\n" linux-image-amd64; test -s "/boot/vmlinuz-$(uname -r)"' >> guest-package-install.log 2>&1 || { echo "Kernel package or old running boot image missing" >&2; exit 1; }
 
-  echo "Selecting new installed Debian generic kernel for trial boot."\n  echo "Kernel package installation completed; collecting GRUB diagnostics."
+  echo "Selecting new installed Debian generic kernel for trial boot."
   target_kernel="$(ssh "${ssh_opts[@]}" lksutest@127.0.0.1 "find /boot -maxdepth 1 -name 'vmlinuz-*-amd64' -printf '%f\\n' | sed 's/^vmlinuz-//' | grep -v -- '-cloud-amd64
   ssh "${ssh_opts[@]}" lksutest@127.0.0.1 'find /boot -maxdepth 1 -name "vmlinuz-*" -type f -printf "%f\\n"' >> guest-package-install.log 2>&1
 
