@@ -33,7 +33,7 @@ class ManagedDebianTests(unittest.TestCase):
             state.write_text(json.dumps(persisted))
             with patch.object(backend.subprocess, "run", side_effect=[
                 subprocess.CompletedProcess([], 0),
-                subprocess.CompletedProcess([], 0, stdout="saved_entry=advanced>new\\n")]):
+                subprocess.CompletedProcess([], 0, stdout="saved_entry=advanced>new\n")]):
                 passed = backend.verify_managed(state, "6.1-new", True)
             self.assertTrue(passed["healthy"])
             self.assertIn('"pending": false', state.read_text())
