@@ -184,6 +184,41 @@ After email setup, LKSU asks separate questions about updating the kernel and re
 
 **Secrets and safety:** LKSU stores mail settings in root-only `/etc/lksu/config.json` (mode `0600`). This is a local configuration file containing an SMTP secret, **not** a vault. Never paste tokens/passwords into GitHub issues, README examples, chat messages, screenshots or public logs; never commit the config file. Prefer a separate SMTP credential for each server. If credentials leak, revoke/rotate them at the provider. Because the current Report email doubles as From, make sure that address is a permitted sender. If you change SMTP settings after installation, back up and review existing automation settings before re-running the full `sudo lksu configure` wizard, which replaces configuration.
 
+## Watching kernel installation and automatic reboot
+
+In a **future release containing the progress-event change** (not the pinned v0.3.16 installer), the interactive installer and LKSU maintenance runs print **flushed progress events** before starting DNF, before preparing a one-time GRUB boot, and immediately before asking systemd to restart the server. Progress appears on stderr, so `lksu ... --json` stdout stays valid JSON.
+
+Example of messages during a real, authorized update (not a simulation of reboot success):
+
+```text
+LKSU [INIT] Starting first managed kernel maintenance pass...
+LKSU [CHECK] Checking installed kernel versions, repositories and /boot space...
+LKSU [UPDATE] Eligible kernel upgrade found; installing repository RPM packages with DNF. Please do not close this session.
+LKSU [UPDATE] Kernel RPM installation finished. Running: OLD_KERNEL; next-boot candidate: NEW_KERNEL.
+LKSU [REBOOT] Checking operator-approved recovery readiness and application health...
+LKSU [REBOOT] Pre-reboot application checks passed (N). Recovery prerequisites were confirmed by the operator.
+LKSU [REBOOT] Preparing one-time GRUB boot with previous-kernel fallback...
+LKSU [REBOOT] One-time GRUB boot staged for NEW_KERNEL; persistent fallback: OLD_KERNEL.
+LKSU [REBOOT] Requesting system reboot NOW for one-time trial kernel NEW_KERNEL. SSH may disconnect. Boot success is verified only after the server returns.
+```
+
+When the server reboots, **SSH/PuTTY disconnecting is normal**. That disconnection is **not** proof the new kernel booted successfully. After reconnecting, inspect the verification log and running/default kernels:
+
+```bash
+uname -r
+grubby --default-kernel
+journalctl -b -u lksu-verify.service -n 60 --no-pager
+sudo /usr/local/bin/lksu scheduled
+```
+
+For an unattended timer update, read the actual progress in the system journal (no routine email or active SSH window is required):
+
+```bash
+journalctl -u lksu-maintenance.service -u lksu-verify.service --no-pager -n 100
+```
+
+**Important:** Progress output is not a safety check or a guarantee of recovery. LKSU still requires real configured application checks, an operator-confirmed external snapshot/provider recovery path and successful post-boot verification. Do **not** trigger `initialize` or `maintenance` merely to see the messages: those commands can install kernels and reboot production servers. Use `scheduled` for a safe read-only check. Published v0.3.16 does **not** contain these progress messages until a newer LKSU release is published.
+
 ## Automatic kernel lifecycle and LKSU self-updates
 
 **Two independent update channels:** The existing daily `lksu scheduled` job reports on kernel RPMs without making changes. `lksu-maintenance.timer` (when explicitly enabled) checks every 15 minutes and installs eligible kernel RPM upgrades either during its configured window or at any time when the operator explicitly disables the time restriction. When the latest installed GRUB default differs from the running kernel, LKSU now reports **REBOOT REQUIRED** even when DNF says 0 upgrades. When a maintenance run is authorized, it can adopt an already-installed *newer* default kernel after validating the kernel-core RPMs, boot images, initramfs, native RPM version ordering and GRUB entries.
