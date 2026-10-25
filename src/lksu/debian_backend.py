@@ -89,3 +89,43 @@ def check_host(distro_id, running_release):
             result.stdout.strip() == "install ok installed",
             "installed_boot_images": sorted(images),
             "status": "inventory-only"}
+
+
+def grub_menu_entry(release, config=pathlib.Path("/boot/grub/grub.cfg")):
+    """Resolve a GRUB one-shot menu path from the actual guest configuration."""
+    if not RELEASE.fullmatch(release):
+        raise DebianKernelError("Invalid kernel release")
+    if not config.is_file():
+        raise DebianKernelError("GRUB configuration missing")
+    lines = config.read_text().splitlines()
+    stack = []
+    depth = 0
+    for line in lines:
+        stripped = line.strip()
+        match = re.match(r"^(menuentry|submenu) ['\"]([^'\"]+)['\"]", stripped)
+        if match:
+            kind, label = match.groups()
+            identifier = re.search(r"(?:--id|\\$menuentry_id_option)\\s+['\"]?([A-Za-z0-9._+~-]+)", stripped)
+            stack.append((kind, identifier.group(1) if identifier else label, depth))
+        if re.search(r"(?:^|\\s)(?:linux|linuxefi)\\s+\\S*vmlinuz-" + re.escape(release) + r"(?:\\s|$)", stripped):
+            path = ">".join(item[1] for item in stack)
+            if not path:
+                raise DebianKernelError("Kernel found outside GRUB menu")
+            return path
+        depth += line.count("{") - line.count("}")
+        stack = [entry for entry in stack if entry[2] < depth]
+    raise DebianKernelError("Kernel missing from GRUB menu")
+
+
+def stage_one_shot(release, *, runner=subprocess.run, config=pathlib.Path("/boot/grub/grub.cfg")):
+    """Stage a trial boot; do not reboot or change the persistent default."""
+    if release not in boot_images():
+        raise DebianKernelError("Candidate boot image missing")
+    entry = grub_menu_entry(release, config)
+    try:
+        result = runner(["grub-reboot", entry], check=False, timeout=30)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise DebianKernelError("GRUB one-shot selection failed") from exc
+    if result.returncode:
+        raise DebianKernelError("GRUB one-shot selection failed")
+    return {"candidate": release, "trial_entry": entry, "rebooted": False}
