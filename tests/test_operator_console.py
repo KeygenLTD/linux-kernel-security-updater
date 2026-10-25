@@ -79,5 +79,27 @@ class ConsoleTests(unittest.TestCase):
         self.assertFalse(save.call_args.args[1]["automatic_lksu_updates"])
 
 
+    @patch("lksu.cli.core.save")
+    @patch("lksu.cli.core.os_version", return_value="10.2")
+    @patch("lksu.cli.os.geteuid", return_value=0)
+    @patch("lksu.cli.getpass.getpass", return_value="dedicated-token")
+    @patch("builtins.input")
+    def test_fresh_install_defaults_to_stable_kernel_automation_and_safe_reboot(
+        self, prompt, _token, _root, _os, save
+    ):
+        prompt.side_effect = lambda label: "operator@example.com" if label == "Report email: " else ""
+        with contextlib.redirect_stdout(io.StringIO()):
+            cli.setup()
+        data = save.call_args.args[1]
+        self.assertTrue(data["automatic_updates"])
+        self.assertEqual(data["policy"], "all-stable")
+        self.assertTrue(data["automatic_lksu_updates"])
+        self.assertTrue(data["maintenance_window"]["enabled"])
+        self.assertFalse(data["automatic_reboot"])
+        self.assertFalse(data["recovery_ready"])
+        self.assertEqual(data["smtp_password"], "dedicated-token")
+
+
+
 if __name__ == "__main__":
     unittest.main()
