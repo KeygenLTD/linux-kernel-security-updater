@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.error
 import urllib.request
 import venv
 from pathlib import Path
@@ -80,7 +81,7 @@ def _download(info, destination):
     req = urllib.request.Request(info["url"], headers={"User-Agent": "LKSU-SelfUpdater/0.3"})
     with urllib.request.urlopen(req, timeout=40) as response, destination.open("wb") as file:
         parsed = urlparse(response.geturl())
-        if parsed.scheme != "https" or (
+        if parsed.scheme != "https" or not parsed.hostname or (
             parsed.hostname != "github.com" and not parsed.hostname.endswith(".githubusercontent.com")
         ):
             raise LKSUError("Wheel download redirected to an untrusted host")
@@ -97,7 +98,10 @@ def _download(info, destination):
 
 
 def _cmd(*args):
-    p = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=180)
+    try:
+        p = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=180)
+    except subprocess.TimeoutExpired as exc:
+        raise LKSUError("Self-update command timed out") from exc
     if p.returncode:
         raise LKSUError(f"Self-update command failed: {args[0]}: {p.stderr.strip()[:400]}")
     return p.stdout
@@ -143,6 +147,8 @@ def _activate_release(target):
             if kind == "link":
                 link_atomically(path, destination)
             elif kind == "file":
+                if path.is_symlink():
+                    path.unlink()
                 shutil.copy2(destination, path)
             elif path.is_symlink():
                 path.unlink()
@@ -151,7 +157,12 @@ def _activate_release(target):
 
 def check():
     current = installed_version()
-    info = release_info()
+    try:
+        info = release_info()
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return {"status": "self-update-no-release", "installed_version": current}
+        raise
     newer = version_tuple(info["tag"]) > version_tuple(current)
     return {"status": "self-update-available" if newer else "self-update-current",
             "installed_version": current, "release_version": info["tag"],
@@ -169,8 +180,13 @@ def update(*, automatic=False, enabled=False):
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
             raise LKSUError("Another LKSU self-update is running") from exc
-        info = release_info()
         current = installed_version()
+        try:
+            info = release_info()
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                return {"status": "self-update-no-release", "installed_version": current}
+            raise
         if version_tuple(info["tag"]) <= version_tuple(current):
             return {"status": "self-update-current", "installed_version": current, "release_version": info["tag"]}
         stage_root = ROOT / "releases"
