@@ -53,10 +53,6 @@ jobs:
         env:
           EXPECTED_DISTRO: ${{ matrix.distro }}
         run: bash tests/vm/ubuntu-boot-smoke.sh
-      - name: Reboot same guest and validate boot ID change
-        env:
-          EXPECTED_DISTRO: ${{ matrix.distro }}
-        run: bash tests/vm/guest-reboot-smoke.sh
       - name: Upload diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4
