@@ -226,7 +226,7 @@ def send_report(cfg, subject, body):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Linux Kernel Security Updater")
     parser.add_argument("--json", action="store_true", help="Print the full machine-readable report instead of an operator summary")
-    parser.add_argument("command", choices=("compatibility", "kernel-inventory", "debian-kernel-check", "configure", "configure-automation", "configure-self-update", "initialize", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check", "self-update", "self-update-check", "self-update-scheduled"))
+    parser.add_argument("command", choices=("compatibility", "kernel-inventory", "debian-kernel-check", "debian-kernel-apply", "debian-kernel-stage", "debian-kernel-verify", "configure", "configure-automation", "configure-self-update", "initialize", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check", "self-update", "self-update-check", "self-update-scheduled"))
     args = parser.parse_args(argv)
     reboot_requested = False
     mail_failure = None
@@ -274,6 +274,30 @@ def main(argv=None):
             configure_automation()
             return 0
         cfg = core.config()
+        if args.command in {"debian-kernel-apply", "debian-kernel-stage", "debian-kernel-verify"}:
+            from .distributions import detect
+            from . import debian_backend
+            distro = detect()
+            if distro.identifier not in {"debian", "ubuntu"}:
+                raise core.LKSUError("Debian-family backend requires Debian or Ubuntu")
+            if os.geteuid():
+                raise core.LKSUError("Root required")
+            if args.command == "debian-kernel-stage" and not cfg.get("recovery_ready"):
+                raise core.LKSUError("Snapshot and provider console recovery must be confirmed")
+            with core.kernel_operation_lock():
+                if args.command == "debian-kernel-apply":
+                    result = debian_backend.apply_managed(
+                        distro.identifier, os.uname().release, core.STATE)
+                elif args.command == "debian-kernel-stage":
+                    result = debian_backend.stage_managed_trial(core.STATE)
+                else:
+                    from .health import check_all
+                    checks = check_all(cfg)
+                    result = debian_backend.verify_managed(
+                        core.STATE, os.uname().release,
+                        bool(checks) and all(checks.values()))
+            print(json.dumps(result, indent=2))
+            return 0 if result.get("healthy", True) else 2
         if args.command == "initialize":
             with core.kernel_operation_lock():
                 result, reboot_requested = core.initial_run(cfg)
