@@ -1,5 +1,5 @@
 [Unit]
-Description=Install eligible kernel updates within the LKSU maintenance window
+Description=Install eligible kernel updates and perform guarded kernel reboot
 After=network-online.target
 Wants=network-online.target
 
