@@ -1,0 +1,48 @@
+name: isolated QEMU VM smoke
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/vm-smoke.yml"
+      - "tests/vm/**"
+      - "src/**"
+      - "pyproject.toml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vm-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ubuntu-vm:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install QEMU and image tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils cloud-image-utils openssh-client
+      - name: Download Ubuntu cloud image and validate checksum
+        run: |
+          set -euo pipefail
+          base=https://cloud-images.ubuntu.com/noble/current
+          curl --fail --location --retry 3 --output noble-server-cloudimg-amd64.img "$base/noble-server-cloudimg-amd64.img"
+          curl --fail --location --retry 3 --output SHA256SUMS "$base/SHA256SUMS"
+          grep 'noble-server-cloudimg-amd64.img$' SHA256SUMS | sha256sum --check
+          qemu-img info noble-server-cloudimg-amd64.img
+      - name: Boot isolated guest and verify its kernel via SSH
+        run: bash tests/vm/ubuntu-boot-smoke.sh
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-vm-diagnostics
+          path: |
+            vm-serial.log
+            vm-qemu.log
+          if-no-files-found: ignore
+          retention-days: 7
