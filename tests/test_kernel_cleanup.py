@@ -1,4 +1,6 @@
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from lksu import core, kernel_cleanup
@@ -37,7 +39,7 @@ class SafeKernelCleanupTests(unittest.TestCase):
                 )
             if args[:2] == ("rpm", "-q"):
                 candidate = args[-1]
-                if candidate.endswith(ANCIENT):
+                if candidate.endswith(ANCIENT) and not candidate.startswith("kernel-modules-extra-"):
                     return process(candidate + "\\n")
                 return process(returncode=1)
             if args[:3] == ("rpm", "-e", "--test"):
@@ -47,15 +49,16 @@ class SafeKernelCleanupTests(unittest.TestCase):
                 dnf_removals.append(args)
                 return process()
             raise AssertionError("Unexpected command: " + str(args))
-        with patch.object(kernel_cleanup.shutil, "disk_usage", side_effect=[
+        with tempfile.TemporaryDirectory() as folder, patch.object(
+            core, "STATE", Path(folder) / "state.json"
+        ), patch.object(kernel_cleanup.shutil, "disk_usage", side_effect=[
             disk(480 * MIB), disk(650 * MIB)
         ]), patch.object(core.os, "uname", return_value=type(
             "U", (), {"release": RUNNING, "machine": "x86_64"}
         )()), patch.object(core, "run", side_effect=fake_run), patch.object(
             core, "default_kernel", return_value="/boot/vmlinuz-" + RUNNING
         ), patch.object(core, "pending_update", return_value=None), patch.object(
-            core.STATE, "exists", return_value=False
-        ), patch.object(core, "installed", return_value=[FALLBACK, RUNNING]):
+            core, "installed", return_value=[FALLBACK, RUNNING]):
             removed = kernel_cleanup.reclaim_for_update()
         self.assertEqual(removed, [ANCIENT])
         self.assertEqual(len(rpm_erasures), 1)
@@ -131,15 +134,16 @@ class SafeKernelCleanupTests(unittest.TestCase):
             "updates": [{"name": "kernel-core", "evr": "latest", "arch": "x86_64"}],
             "security_advisories": [],
         }
-        with patch.object(core, "check", return_value=available), patch.object(
+        with tempfile.TemporaryDirectory() as folder, patch.object(
+            core, "STATE", Path(folder) / "state.json"
+        ), patch.object(core, "check", return_value=available), patch.object(
             core, "preflight"
         ) as preflight, patch.object(
             core, "installed", return_value=[RUNNING, "new"]
         ), patch.object(core, "default_kernel", return_value="/boot/vmlinuz-new"), patch.object(
-            core.Path, "exists", return_value=True
-        ), patch.object(core.Path, "is_file", return_value=True), patch.object(
-            core, "save"
-        ), patch.object(core, "run"), patch.object(
+            core.Path, "exists", autospec=True,
+            side_effect=lambda path: str(path) == "/boot/vmlinuz-" + RUNNING
+        ), patch.object(core, "save"), patch.object(core, "run"), patch.object(
             kernel_cleanup, "reclaim_for_update", return_value=[ANCIENT]
         ) as reclaim:
             report = core.apply("all-stable")
