@@ -57,6 +57,29 @@ transaction, bootloader, snapshot/recovery and post-boot tests pass. A distro
 that cannot be safely identified or recovered always fails closed.
 No SSH access to production servers was used to develop this feature.
 
+## Kernel CVEs addressed by official vendor security updates
+
+The following are **verified AlmaLinux security advisory mappings**, not a
+claim that installing LKSU automatically remediates them on every host. LKSU
+uses enabled vendor repositories; remediation requires the relevant fixed
+kernel package to be installed **and booted**, with post-boot verification.
+Affectedness depends on distro version, running kernel and backported fixes.
+
+| AlmaLinux | Vendor advisory (release date) | Kernel CVEs addressed in that advisory |
+| --- | --- | --- |
+| 8 | [ALSA-2026:82807](https://errata.almalinux.org/8/ALSA-2026-82807.html) (2026-10-14) | CVE-2026-31678, CVE-2026-63920, CVE-2026-68108, CVE-2026-68236, CVE-2026-68278, CVE-2026-68409, CVE-2026-72318, CVE-2026-80887, CVE-2026-89811 |
+| 9 | [ALSA-2026:77689](https://errata.almalinux.org/9/ALSA-2026-77689.html) (2026-10-14) | CVE-2026-23103, CVE-2026-53360, CVE-2026-53365, CVE-2026-53398, CVE-2026-63970, CVE-2026-64035, CVE-2026-64115, CVE-2026-64162, CVE-2026-72317, CVE-2026-74744, CVE-2026-89530, CVE-2026-89663, CVE-2026-89669, CVE-2026-89690 |
+| 10 | [ALSA-2026:85321](https://errata.almalinux.org/10/ALSA-2026-85321.html) (2026-10-22) | CVE-2026-31678, CVE-2026-52935, CVE-2026-52917, CVE-2026-63801, CVE-2026-63971, CVE-2026-63962, CVE-2026-68162, CVE-2026-68117, CVE-2026-68300, CVE-2026-68315, CVE-2026-74509, CVE-2026-74588, CVE-2026-74752, CVE-2026-89631, CVE-2026-89633, CVE-2026-98256, CVE-2026-98260 |
+
+**Not yet counted as patched in standard LKSU updates:** [ZDI-CAN-33367](https://almalinux.org/blog/2026-10-23-zdi-can-33367/) had only testing-repository kernels announced on 2026-10-23. LKSU deliberately does not enable testing repositories. A ZDI-CAN identifier is not a confirmed CVE number.
+
+For host-specific available advisories, run `lksu check --json` on a
+supported AlmaLinux host. For verified remediation, compare vendor advisory
+and the **currently running** kernel after reboot. This snapshot of upstream
+advisories is dated **2026-10-25** and is not automatically kept up to date.
+Do not extrapolate these AlmaLinux advisory mappings to CloudLinux, Ubuntu,
+Debian or other detected distributions.
+
 ## Safety model
 
 - The interactive one-command installer defaults to `all-stable` automatic kernel updates and offers guarded automatic reboot; the operator can decline. Direct/manual setups must configure a kernel policy explicitly. The daily read-only check does not send routine emails.
