@@ -2,7 +2,7 @@
 
 ![LKSU kernel update, verification and fallback illustration](docs/assets/lksu-hero.png)
 
-> **Status: v0.3.12 early preview.** Unit tested, but not yet integration tested across AlmaLinux 8/9/10, BIOS/UEFI, DNF and GRUB combinations. Do not activate automatic installation or reboot on production hosts until those checks and a provider-console recovery drill pass.
+> **Status: v0.3.13 early preview.** Unit tested, but not yet integration tested across AlmaLinux 8/9/10, BIOS/UEFI, DNF and GRUB combinations. Do not activate automatic installation or reboot on production hosts until those checks and a provider-console recovery drill pass.
 
 Early production-oriented release for **AlmaLinux 8, 9 and 10**. LKSU uses the distribution's enabled DNF repositories. It does not enable testing repositories, select a CVE-specific build, download arbitrary RPMs, or reboot a machine automatically.
 
@@ -37,15 +37,15 @@ systemctl list-timers lksu.timer
 
 ## One-command setup (recommended)
 
-For a pinned GitHub release on AlmaLinux 8/9/10 (after the v0.3.12 release is published):
+For a pinned GitHub release on AlmaLinux 8/9/10 (after the v0.3.13 release is published):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/KeygenLTD/linux-kernel-security-updater/v0.3.12/bootstrap.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/KeygenLTD/linux-kernel-security-updater/v0.3.13/bootstrap.sh | sudo bash
 ```
 
 This installs LKSU, asks for the report email and provider settings, then runs a read-only check and sends the first report. It does not enable automatic updates or reboot unless explicitly selected.
 
-## Automatic kernel lifecycle and LKSU self-updates (v0.3.12)
+## Automatic kernel lifecycle and LKSU self-updates
 
 **Two independent update channels:** The existing daily `lksu scheduled` job reports on kernel RPMs without making changes. `lksu-maintenance.timer` (when explicitly enabled) checks every 15 minutes and only installs kernel RPM upgrades inside its configured window. When the latest installed GRUB default differs from the running kernel, LKSU now reports **REBOOT REQUIRED** even when DNF says 0 upgrades. During a maintenance window, it can adopt an already-installed *newer* default kernel after validating the kernel-core RPMs, boot images, initramfs, native RPM version ordering and GRUB entries.
 
@@ -64,6 +64,14 @@ sudo systemctl list-timers --all 'lksu*'
 ```
 
 Enable **LKSU application updates** by editing the existing config to set `"automatic_lksu_updates": true`, while keeping mode 0600. Kernel automation and automatic reboot have **separate** flags. Do not set `recovery_ready=true` until a recovery drill and backup are complete. For visibility, `sudo lksu scheduled` displays the boot status without installing or rebooting. The installer upgrades the application's own systemd unit files but preserves the existing configuration. A release is eligible only **after** its Git tag and GitHub Release wheel have been published; publishing tags is a maintainer action rather than a server-initiated process.
+
+## Console output and installer preferences
+
+By default LKSU prints a **compact English operator summary**, not a JSON advisory dump. `lksu scheduled`, `lksu check` and `lksu maintenance` show the running kernel, intended boot kernel, reboot requirement, package update count, advisory count, maintenance schedule and next action. A count of advisories does not, by itself, prove a running kernel is vulnerable. Advanced operators and integrations can request unabridged JSON explicitly using `lksu scheduled --json` or `lksu check --json`.
+
+For a **new installation**, the interactive `lksu configure` setup asks whether verified LKSU application releases should be installed automatically, with a yes default. For an **existing installation** with no recorded self-update preference, the bootstrap installer asks this question once without discarding configured SMTP credentials or kernel policy. When no interactive terminal is available, the installer does not silently opt in. Reinstalling with an explicit `true` or `false` preference keeps it.
+
+`sudo lksu configure-self-update` changes just that self-update preference, avoiding the need to enter mail credentials again. The installer provisions the daily self-update timer automatically. A new release must still be published as a GitHub Release wheel, pass digest checks, and have a version newer than the one running before it can be activated. LKSU kernel auto-install and reboot settings remain separate.
 
 ## Email reports
 
