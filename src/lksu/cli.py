@@ -157,7 +157,11 @@ def main(argv=None):
             result = {"old_default": core.select_old(), "rebooted": False}
         output = json.dumps(result, indent=2)
         print(output)
-        routine_reports = args.command in {"scheduled", "apply", "maintenance", "stage-reboot", "verify", "self-update", "self-update-scheduled"}\n        if args.command == "self-update-scheduled" and result.get("status") in {\n            "self-update-disabled", "self-update-no-release", "self-update-current"\n        }:\n            routine_reports = False
+        routine_reports = args.command in {"scheduled", "apply", "maintenance", "stage-reboot", "verify", "self-update", "self-update-scheduled"}
+        if args.command == "self-update-scheduled" and result.get("status") in {
+            "self-update-disabled", "self-update-no-release", "self-update-current"
+        }:
+            routine_reports = False
         if (routine_reports and cfg.get("notifications", True)) or (args.command == "security-check" and result["alerts"]):
             subject, body = build_email_report(cfg, args.command, result)
             report_attempted = True
