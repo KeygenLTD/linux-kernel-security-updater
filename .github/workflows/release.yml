@@ -41,16 +41,32 @@ jobs:
           PY
       - name: Build a versioned wheel
         run: python -m build --wheel --outdir dist
+      - name: Validate wheel contents and clean install
+        run: |
+          python - <<'PY'
+          import pathlib, re, zipfile
+          version = re.search(r'^version\s*=\s*"([^"]+)"', pathlib.Path("pyproject.toml").read_text(), re.M).group(1)
+          wheels = list(pathlib.Path("dist").glob("*.whl"))
+          assert len(wheels) == 1
+          assert wheels[0].name == f"lksu-{version}-py3-none-any.whl"
+          with zipfile.ZipFile(wheels[0]) as archive:
+              assert archive.testzip() is None
+              assert "lksu/cli.py" in archive.namelist()
+              metadata = [n for n in archive.namelist() if n.endswith(".dist-info/METADATA")]
+              assert len(metadata) == 1
+              assert re.search(r"^Version: " + re.escape(version) + r"$", archive.read(metadata[0]).decode(), re.M)
+          print("Wheel integrity verified:", wheels[0].name)
+          PY
+          python -m venv "$RUNNER_TEMP/lksu-wheel-proof"
+          "$RUNNER_TEMP/lksu-wheel-proof/bin/python" -m pip install --no-deps dist/*.whl
+          "$RUNNER_TEMP/lksu-wheel-proof/bin/lksu" --help >/dev/null
+          sha256sum dist/*.whl
       - name: Publish wheel as GitHub Release asset
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           test "$(find dist -maxdepth 1 -name '*.whl' | wc -l)" -eq 1
           tag="${{ steps.version.outputs.tag }}"
-          if gh release view "$tag" >/dev/null 2>&1; then
-            echo "Release $tag already exists; keeping published artifacts immutable."
-            exit 0
-          fi
           if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
             if [ "$GITHUB_REF" != "refs/heads/main" ]; then
               echo "Refusing to create a missing tag outside main" >&2
@@ -64,4 +80,14 @@ jobs:
             echo "Existing tag points to a different commit; refusing release" >&2
             exit 1
           fi
-          gh release create "$tag" dist/*.whl --title "$tag" --generate-notes --verify-tag
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; verifying its published wheel."
+          else
+            gh release create "$tag" dist/*.whl --title "$tag" --generate-notes --verify-tag
+          fi
+          mkdir -p "$RUNNER_TEMP/published-wheel"
+          gh release download "$tag" --pattern 'lksu-*.whl' --dir "$RUNNER_TEMP/published-wheel" --clobber
+          test "$(find "$RUNNER_TEMP/published-wheel" -maxdepth 1 -name '*.whl' | wc -l)" -eq 1
+          cmp dist/*.whl "$RUNNER_TEMP/published-wheel"/*.whl
+          echo "Published wheel matches the tested build byte-for-byte."
+          sha256sum "$RUNNER_TEMP/published-wheel"/*.whl

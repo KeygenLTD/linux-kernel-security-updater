@@ -2,7 +2,7 @@
 
 ![LKSU kernel update, verification and fallback illustration](docs/assets/lksu-hero.png)
 
- > **Status: v0.3.18 early preview.** CI unit tests target Python 3.9, 3.11 and 3.13. One AlmaLinux 9.8 VPS successfully completed a kernel RPM update, automatic trial reboot and post-boot service verification with an earlier LKSU release. That does **not** validate v0.3.18 on a production host, all AlmaLinux 8/9/10 BIOS/UEFI/recovery variants, or automatic kernel cleanup. Confirm an external snapshot, provider console and service checks before unattended reboot.
+> **Status: v0.3.18 early preview.** CI unit tests target Python 3.9, 3.11 and 3.13. One AlmaLinux 9.8 VPS successfully completed a kernel RPM update, automatic trial reboot and post-boot service verification with an earlier LKSU release. That does **not** validate v0.3.18 on a production host, all AlmaLinux 8/9/10 BIOS/UEFI/recovery variants, or automatic kernel cleanup. Confirm an external snapshot, provider console and service checks before unattended reboot.
 
 Early production-oriented release for **AlmaLinux 8, 9 and 10**. LKSU uses the distribution's enabled DNF repositories. It does not enable testing repositories, select a CVE-specific build, or download arbitrary RPMs. It requests automatic reboot only after opt-in and safety checks.
 
@@ -25,14 +25,12 @@ Early production-oriented release for **AlmaLinux 8, 9 and 10**. LKSU uses the d
 The recommended path is the interactive one-command installer below. Manual installation is also possible. The current setup wizard supports Postmark, SMTP2GO or custom authenticated SMTP.
 
 ```bash
-sudo dnf install -y python3 python3-pip grubby
-sudo python3 -m pip install --prefix=/usr/local .
-sudo lksu configure
-sudo lksu check
-sudo install -m 644 systemd/lksu.service systemd/lksu.timer /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now lksu.timer
-systemctl list-timers lksu.timer
+sudo ./install.sh
+sudo /usr/local/bin/lksu configure
+sudo systemctl enable --now lksu.timer lksu-maintenance.timer lksu-security-watch.timer
+sudo systemctl enable lksu-verify.service
+sudo /usr/local/bin/lksu scheduled
+systemctl list-timers lksu.timer lksu-maintenance.timer
 ```
 
 ## One-command setup (recommended)
