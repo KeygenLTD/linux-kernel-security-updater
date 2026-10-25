@@ -3,6 +3,7 @@ set -euo pipefail
 umask 077
 workdir="$(mktemp -d)"
 qemu_pid=""
+: "${EXPECTED_DISTRO:?EXPECTED_DISTRO is required}"
 cleanup() {
   if [[ -n "$qemu_pid" ]]; then
     kill "$qemu_pid" 2>/dev/null || true
@@ -27,7 +28,7 @@ disable_root: true
 EOF
 printf 'instance-id: lksu-ci-vm\nlocal-hostname: lksu-vm\n' > "$workdir/meta-data"
 cloud-localds "$workdir/seed.img" "$workdir/user-data" "$workdir/meta-data"
-qemu-img create -f qcow2 -F qcow2 -b "$PWD/noble-server-cloudimg-amd64.img" "$workdir/guest.qcow2" 8G
+qemu-img create -f qcow2 -F qcow2 -b "$PWD/guest-base.img" "$workdir/guest.qcow2" 8G
 qemu-system-x86_64 \
   -machine accel=tcg -cpu max -smp 2 -m 2048 \
   -drive "file=$workdir/guest.qcow2,if=virtio,format=qcow2" \
@@ -46,7 +47,7 @@ for attempt in $(seq 1 90); do
   if ssh -i "$workdir/id_ed25519" -o StrictHostKeyChecking=no \
        -o UserKnownHostsFile=/dev/null -o ConnectTimeout=3 \
        -o BatchMode=yes -p 22222 lksutest@127.0.0.1 \
-       'test "$(id -u)" -ne 0 && test "$(cat /etc/os-release | grep "^ID=")" = "ID=ubuntu" && uname -r && test -d /sys/module' 2>/dev/null; then
+       "test \\$(id -u) -ne 0 && grep -qx 'ID=$EXPECTED_DISTRO' /etc/os-release && uname -r && test -d /sys/module" 2>/dev/null; then
     ready=1
     break
   fi
@@ -56,5 +57,5 @@ if [[ "$ready" != 1 ]]; then
   echo "Isolated VM did not pass SSH/kernel smoke checks" >&2
   exit 1
 fi
-echo "QEMU Ubuntu guest boot and running kernel verification passed."
+echo "QEMU $EXPECTED_DISTRO guest boot and running kernel verification passed."
 echo "No kernel installation, GRUB modification or reboot was attempted."
