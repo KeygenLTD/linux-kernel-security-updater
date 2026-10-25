@@ -15,8 +15,8 @@ name, algorithm = sys.argv[1:]
 text = open("checksums.txt", encoding="utf-8").read()
 match = None
 for line in text.splitlines():
-    gnu = re.fullmatch(r"([a-fA-F0-9]{64,128})\\s+\\*?(.+)", line.strip())
-    bsd = re.fullmatch(r"SHA(?:256|512)\\s*\\(([^)]+)\\)\\s*=\\s*([a-fA-F0-9]{64,128})", line.strip(), re.I)
+    gnu = re.fullmatch(r"([a-fA-F0-9]{64,128})\s+\*?(.+)", line.strip())
+    bsd = re.fullmatch(r"SHA(?:256|512)\s*\(([^)]+)\)\s*=\s*([a-fA-F0-9]{64,128})", line.strip(), re.I)
     if gnu and gnu.group(2).removeprefix("./") == name:
         match = gnu.group(1)
         break
