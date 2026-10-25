@@ -62,6 +62,10 @@ def _window_description(cfg):
 def _outcome(command, result):
     status = result.get("status")
     updates = result.get("updates")
+    if status == "initial-run-completed":
+        return "ALREADY INITIALIZED", "The first kernel installation pass was already completed earlier; no installation or reboot repeated.", "Routine monitoring and maintenance timers continue."
+    if status == "initial-check-only":
+        return "CHECK ONLY", "Initial kernel assessment completed; automatic kernel installation was not authorized.", "Enable automatic installation explicitly to install future kernel updates."
     if status == "error":
         return "ERROR", "Command failed; results must not be treated as a successful check.", "Yes - investigate the error shown below."
     if status == "self-updated":
@@ -251,7 +255,7 @@ def format_console_report(cfg, command, result):
             lines.append("LKSU installed:   " + display(result.get("installed_version")))
         if result.get("release_version"):
             lines.append("Latest release:   " + display(result.get("release_version")))
-    if command in {"check", "scheduled", "maintenance", "apply", "stage-reboot"}:
+    if command in {"initialize", "check", "scheduled", "maintenance", "apply", "stage-reboot"}:
         lines.append("Kernel updates:   " + ("Enabled" if cfg.get("automatic_updates") else "Disabled"))
         lines.append("Automatic reboot: " + ("Enabled (subject to safety checks)" if cfg.get("automatic_reboot") else "Disabled"))
         lines.append("Maintenance:      " + _window_description(cfg))
