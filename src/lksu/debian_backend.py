@@ -71,3 +71,21 @@ def install_kernel(distro_id, running_release, *, flavor="generic", runner=subpr
     return {"previous": running_release,
             "candidate": select_candidate(before, after, running_release),
             "package": package, "rebooted": False}
+
+
+def check_host(distro_id, running_release):
+    """Read-only Debian/Ubuntu kernel readiness check; no apt or boot mutation."""
+    package = kernel_package(distro_id)
+    images = boot_images()
+    if not RELEASE.fullmatch(running_release) or running_release not in images:
+        raise DebianKernelError("Running kernel image is missing or invalid")
+    result = subprocess.run(["dpkg-query", "-W", "-f=${Status}", package],
+                            capture_output=True, text=True, check=False, timeout=30)
+    if result.returncode not in (0, 1):
+        raise DebianKernelError("Cannot query vendor kernel metapackage")
+    return {"distribution": distro_id, "running": running_release,
+            "kernel_metapackage": package,
+            "metapackage_installed": result.returncode == 0 and
+            result.stdout.strip() == "install ok installed",
+            "installed_boot_images": sorted(images),
+            "status": "inventory-only"}
