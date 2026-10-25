@@ -226,7 +226,7 @@ def send_report(cfg, subject, body):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="AlmaLinux Kernel Security Updater")
     parser.add_argument("--json", action="store_true", help="Print the full machine-readable report instead of an operator summary")
-    parser.add_argument("command", choices=("compatibility", "configure", "configure-automation", "configure-self-update", "initialize", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check", "self-update", "self-update-check", "self-update-scheduled"))
+    parser.add_argument("command", choices=("compatibility", "kernel-inventory", "configure", "configure-automation", "configure-self-update", "initialize", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check", "self-update", "self-update-check", "self-update-scheduled"))
     args = parser.parse_args(argv)
     reboot_requested = False
     mail_failure = None
@@ -236,6 +236,15 @@ def main(argv=None):
         if args.command == "compatibility":
             from .distributions import detect
             assessment = detect().as_dict()
+            if args.json:
+                print(json.dumps(assessment, indent=2))
+            else:
+                for key, value in assessment.items():
+                    print(f"{key.replace('_', ' ').capitalize()}: {value}")
+            return 0
+        if args.command == "kernel-inventory":
+            from .kernel_inventory import inventory
+            assessment = inventory()
             if args.json:
                 print(json.dumps(assessment, indent=2))
             else:
