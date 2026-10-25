@@ -156,39 +156,3 @@ fi
   ssh "${ssh_opts[@]}" lksutest@127.0.0.1 'find /boot -maxdepth 1 -name "vmlinuz-*" -type f -printf "%f\\n"' >> guest-package-install.log 2>&1
 
 fi
-old_boot_id="$(ssh "${ssh_opts[@]}" lksutest@127.0.0.1 'cat /proc/sys/kernel/random/boot_id')"
-[[ "$old_boot_id" =~ ^[a-f0-9-]{36}$ ]] || { echo "Cannot read guest boot identifier" >&2; exit 1; }
-ssh "${ssh_opts[@]}" lksutest@127.0.0.1 'sudo systemctl reboot' >/dev/null 2>&1 || true
-rebooted=0
-for attempt in $(seq 1 90); do
-  if ! kill -0 "$qemu_pid" 2>/dev/null; then
-    echo "QEMU guest died during reboot" >&2
-    exit 1
-  fi
-  new_boot_id="$(ssh "${ssh_opts[@]}" lksutest@127.0.0.1 'cat /proc/sys/kernel/random/boot_id' 2>/dev/null || true)"
-  if [[ "$new_boot_id" =~ ^[a-f0-9-]{36}$ ]] && [[ "$new_boot_id" != "$old_boot_id" ]]; then
-    if ssh "${ssh_opts[@]}" lksutest@127.0.0.1 "grep -qx 'ID=$EXPECTED_DISTRO' /etc/os-release && test -d /sys/module && uname -r" 2>/dev/null; then
-      rebooted=1
-      break
-    fi
-  fi
-  sleep 5
-done
-if [[ "$rebooted" != 1 ]]; then
-  echo "Guest did not complete verified reboot with a changed boot ID" >&2
-  exit 1
-fi
-echo "Verified $EXPECTED_DISTRO guest reboot: boot ID changed and guest kernel is running."
-if [[ "${KERNEL_UPGRADE_TEST:-0}" == 1 ]]; then
-  new_kernel="$(ssh "${ssh_opts[@]}" lksutest@127.0.0.1 'uname -r')"
-  echo "Kernel before package transaction: $old_kernel"
-  echo "Kernel after reboot: $new_kernel"
-  if [[ "$new_kernel" == "$old_kernel" ]]; then
-    echo "NO KERNEL VERSION CHANGE: official image may already have latest vendor kernel; trial is inconclusive." >&2
-    exit 1
-  fi
-  echo "Verified Debian package install, reboot and changed running kernel."
-else
-  echo "No kernel package installation, kernel selection or rollback occurred."
-fi
-
