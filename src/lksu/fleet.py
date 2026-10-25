@@ -3,7 +3,6 @@ import argparse
 import hashlib
 import hmac
 import json
-import ipaddress
 from urllib.parse import urlsplit
 import sqlite3
 import ssl
