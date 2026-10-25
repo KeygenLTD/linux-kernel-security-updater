@@ -20,7 +20,7 @@ jobs:
   linux-vm:
     name: isolated VM (${{ matrix.distro }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -30,6 +30,7 @@ jobs:
             checksums_url: https://cloud-images.ubuntu.com/noble/current/SHA256SUMS
             checksum_algorithm: sha256
           - distro: debian
+            kernel_upgrade_test: 1
             image_url: https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2
             checksums_url: https://cloud.debian.org/images/cloud/bookworm/latest/SHA512SUMS
             checksum_algorithm: sha512
@@ -48,6 +49,7 @@ jobs:
       - name: Boot guest, verify distinct Linux kernel and SSH
         env:
           EXPECTED_DISTRO: ${{ matrix.distro }}
+          KERNEL_UPGRADE_TEST: ${{ matrix.kernel_upgrade_test || '0' }}
         run: bash tests/vm/ubuntu-boot-smoke.sh
       - name: Upload diagnostics on failure
         if: failure()
@@ -57,5 +59,6 @@ jobs:
           path: |
             vm-serial.log
             vm-qemu.log
+            guest-package-install.log
           if-no-files-found: ignore
           retention-days: 7
