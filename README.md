@@ -6,7 +6,7 @@
 
 Early production-oriented release for **AlmaLinux 8, 9 and 10**. LKSU uses the distribution's enabled DNF repositories. It does not enable testing repositories, select a CVE-specific build, or download arbitrary RPMs. It requests automatic reboot only after opt-in and safety checks.
 
-## Multi-distribution roadmap (in development)
+See [platform coverage and safety gates](docs/platform-support.md) for CloudLinux, Ubuntu, Debian, SUSE, Arch, NixOS and other families. Detection does not authorize kernel changes.\n\n## Multi-distribution roadmap (in development)
 
 Run `lksu compatibility --json` to inspect the current Linux distribution and the
 available kernel/update/boot backend **without making system changes**.
