@@ -97,7 +97,7 @@ class ConsoleTests(unittest.TestCase):
         self.assertTrue(data["automatic_updates"])
         self.assertEqual(data["policy"], "all-stable")
         self.assertTrue(data["automatic_lksu_updates"])
-        self.assertTrue(data["maintenance_window"]["enabled"])
+        self.assertFalse(data["maintenance_window"]["enabled"])
         self.assertTrue(data["automatic_reboot"])
         self.assertFalse(data["recovery_ready"])
         self.assertEqual(data["smtp_password"], "dedicated-token")
@@ -267,6 +267,29 @@ class ConsoleTests(unittest.TestCase):
             cli.configure_automation()
         self.assertEqual(save.call_args.args[1]["services"], [])
 
+
+    @patch("lksu.cli.core.run")
+    @patch("lksu.cli.core.save")
+    @patch("lksu.cli.core.config")
+    @patch("lksu.cli.os.geteuid", return_value=0)
+    @patch("builtins.input")
+    def test_disabling_window_keeps_kernel_timer_and_reboot_enabled(
+        self, prompt, _root, config, save, run
+    ):
+        data = dict(CFG)
+        data.update({"automatic_reboot": True, "recovery_ready": True, "services": ["mariadb"], "health_urls": []})
+        config.return_value = data
+        prompt.side_effect = lambda message: "n" if message.startswith("Restrict automatic kernel updates") else ""
+        with contextlib.redirect_stdout(io.StringIO()):
+            cli.configure_automation()
+        saved = save.call_args.args[1]
+        self.assertFalse(saved["maintenance_window"]["enabled"])
+        self.assertTrue(saved["automatic_reboot"])
+        self.assertTrue(saved["recovery_ready"])
+        self.assertIn(
+            ("systemctl", "enable", "--now", "lksu-maintenance.timer"),
+            [call.args for call in run.call_args_list],
+        )
 
 
 if __name__ == "__main__":
