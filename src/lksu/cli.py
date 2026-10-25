@@ -12,7 +12,7 @@ from email.message import EmailMessage
 from . import core
 from .fleet import send_report as send_fleet_report
 from .policy import in_maintenance_window
-from .reporting import build_email_report
+from .reporting import build_email_report, format_console_report
 from .security import check as security_check, create_baseline
 from . import self_update
 
@@ -52,7 +52,7 @@ def setup():
         return value in {"y", "yes"}
 
     automatic_updates = yes_no("Enable automatic kernel updates?", False)
-    automatic_lksu_updates = yes_no("Automatically install verified LKSU releases?", False)
+    automatic_lksu_updates = yes_no("Automatically install verified LKSU releases?", True)
     notifications = yes_no("Send an email after every check/update?", True)
     automatic_reboot = yes_no("Enable automatic reboot?", False)
     use_window = yes_no("Use a maintenance window?", False)
@@ -83,6 +83,20 @@ def setup():
     print(f"Configuration saved; automatic reboot is {'enabled' if automatic_reboot else 'disabled'}.")
 
 
+def configure_self_update():
+    """Explicit one-time opt-in for an existing configuration, without resetting SMTP."""
+    if os.geteuid():
+        raise core.LKSUError("Root required")
+    cfg = core.config()
+    answer = input("Automatically install verified LKSU application releases? [Y/n]: ").strip().lower()
+    if answer not in {"", "y", "yes", "n", "no"}:
+        raise core.LKSUError("Answer y or n")
+    enabled = answer in {"", "y", "yes"}
+    cfg["automatic_lksu_updates"] = enabled
+    core.save(core.CONFIG, cfg)
+    print("Automatic LKSU application updates: " + ("Enabled" if enabled else "Disabled"))
+
+
 def send_report(cfg, subject, body):
     msg = EmailMessage()
     msg["Subject"] = subject
@@ -105,7 +119,8 @@ def send_report(cfg, subject, body):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="AlmaLinux Kernel Security Updater")
-    parser.add_argument("command", choices=("configure", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check", "self-update", "self-update-check", "self-update-scheduled"))
+    parser.add_argument("--json", action="store_true", help="Print the full machine-readable report instead of an operator summary")
+    parser.add_argument("command", choices=("configure", "configure-self-update", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check", "self-update", "self-update-check", "self-update-scheduled"))
     args = parser.parse_args(argv)
     reboot_requested = False
     mail_failure = None
@@ -114,6 +129,9 @@ def main(argv=None):
     try:
         if args.command == "configure":
             setup()
+            return 0
+        if args.command == "configure-self-update":
+            configure_self_update()
             return 0
         cfg = core.config()
         if args.command == "self-update-check":
@@ -155,8 +173,10 @@ def main(argv=None):
             if os.geteuid():
                 raise core.LKSUError("Root required")
             result = {"old_default": core.select_old(), "rebooted": False}
-        output = json.dumps(result, indent=2)
-        print(output)
+        if args.json:
+            print(json.dumps(result, indent=2))
+        else:
+            print(format_console_report(cfg, args.command, result))
         routine_reports = args.command in {"scheduled", "apply", "maintenance", "stage-reboot", "verify", "self-update", "self-update-scheduled"}
         if args.command == "self-update-scheduled" and result.get("status") in {
             "self-update-disabled", "self-update-no-release", "self-update-current"
