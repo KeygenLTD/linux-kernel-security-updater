@@ -29,10 +29,6 @@ jobs:
             image_url: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
             checksums_url: https://cloud-images.ubuntu.com/noble/current/SHA256SUMS
             checksum_algorithm: sha256
-          - distro: rocky
-            image_url: https://download.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud.latest.x86_64.qcow2
-            checksums_url: https://download.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud.latest.x86_64.qcow2.CHECKSUM
-            checksum_algorithm: sha256
           - distro: debian
             image_url: https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2
             checksums_url: https://cloud.debian.org/images/cloud/bookworm/latest/SHA512SUMS
