@@ -14,7 +14,7 @@ from .fleet import send_report as send_fleet_report
 from .policy import in_maintenance_window
 from .reporting import build_email_report, format_console_report
 from .security import check as security_check, create_baseline
-from . import self_update
+from . import self_update, notifications
 
 
 def yes_no(prompt, default):
@@ -54,8 +54,8 @@ def setup():
         raise core.LKSUError("Invalid mail configuration")
     automatic_updates = yes_no("Install available kernel updates on setup and automatically thereafter?", True)
     automatic_lksu_updates = yes_no("Automatically install verified LKSU releases?", True)
-    notifications = yes_no("Send an email after every check/update?", True)
-    automatic_reboot = yes_no("Enable automatic reboot after installing a kernel (safety checks required)?", False)
+    notify_events = yes_no("Email only when updates succeed or fail?", True)
+    automatic_reboot = yes_no("Automatically reboot after installing a kernel when recovery checks pass?", True)
     use_window = yes_no("Use a maintenance window for future kernel installations?", automatic_updates or automatic_reboot)
     start = input("Maintenance start [03:00]: ").strip() or "03:00" if use_window else "03:00"
     duration = int(input("Maintenance duration in minutes [60]: ").strip() or "60") if use_window else 60
@@ -81,7 +81,7 @@ def setup():
                             "smtp_user": user, "smtp_password": password, "policy": policy,
                             "services": parsed, "health_urls": parsed_urls,
                             "automatic_updates": automatic_updates, "automatic_lksu_updates": automatic_lksu_updates,
-                            "recovery_ready": recovery_ready, "notifications": notifications,
+                            "recovery_ready": recovery_ready, "notifications": notify_events,
                             "automatic_reboot": automatic_reboot,
                             "maintenance_window": {"enabled": use_window, "start": start, "duration_minutes": duration},
                             "security_watch": {"required_services": ["auditd", "firewalld"],
@@ -244,18 +244,12 @@ def main(argv=None):
         else:
             print(format_console_report(cfg, args.command, result))
         routine_reports = args.command in {"initialize", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "self-update", "self-update-scheduled"}
-        if args.command == "self-update-scheduled" and result.get("status") in {
-            "self-update-disabled", "self-update-no-release", "self-update-current"
-        }:
-            routine_reports = False
-        if (routine_reports and cfg.get("notifications", True)) or (args.command == "security-check" and result["alerts"]):
-            subject, body = build_email_report(cfg, args.command, result)
-            report_attempted = True
-            try:
-                send_report(cfg, subject, body)
-            except (OSError, ValueError, KeyError, smtplib.SMTPException) as mail_error:
-                mail_failure = mail_error
-                print(f"LKSU email delivery failed: {mail_error}", file=sys.stderr)
+        report_attempted = True
+        try:
+            notifications.send_event(cfg, args.command, result, send_report, build_email_report)
+        except (core.LKSUError, OSError, ValueError, KeyError, smtplib.SMTPException) as mail_error:
+            mail_failure = mail_error
+            print(f"LKSU event email delivery failed: {mail_error}", file=sys.stderr)
         if routine_reports or args.command == "security-check":
             send_fleet_report(cfg, {"command": args.command, "result": result, "hostname": os.uname().nodename, "reported_at": int(datetime.now().timestamp())})
         if reboot_requested:
@@ -266,12 +260,10 @@ def main(argv=None):
     except (core.LKSUError, OSError, ValueError, KeyError, smtplib.SMTPException) as exc:
         print(f"LKSU error: {exc}", file=sys.stderr)
         # Report failed scheduled actions too, without retrying a failed SMTP send.
-        if cfg is not None and not report_attempted and cfg.get("notifications", True) and args.command in {
-            "initialize", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "security-check", "self-update", "self-update-scheduled"
-        }:
+        if cfg is not None and not report_attempted and args.command in notifications.UPDATE_COMMANDS:
             try:
-                subject, body = build_email_report(cfg, args.command, {"status": "error", "error": str(exc)})
-                send_report(cfg, subject, body)
+                notifications.send_event(cfg, args.command, {"status": "error", "error": str(exc)},
+                                         send_report, build_email_report)
             except (core.LKSUError, OSError, ValueError, KeyError, smtplib.SMTPException) as mail_error:
                 print(f"LKSU report delivery failed: {mail_error}", file=sys.stderr)
         return 1
