@@ -48,10 +48,10 @@ def _rollback_status(installed_kernels, result):
 
 def _window_description(cfg):
     window = cfg.get("maintenance_window")
-    if not isinstance(window, dict) or window.get("enabled", True) is False:
-        return "Disabled"
-    if not window:
+    if not isinstance(window, dict) or not window:
         return "Not configured"
+    if window.get("enabled", True) is False:
+        return "Any time (15-minute checks)"
     start = window.get("start")
     duration = window.get("duration_minutes", 60)
     if start is None:
@@ -89,7 +89,7 @@ def _outcome(command, result):
     if status == "trial-boot-staged":
         return "TRIAL BOOT STAGED", "One-shot trial boot was staged; the previous kernel remains the persistent fallback.", "Monitor host access and complete post-boot health verification."
     if result.get("reboot_required"):
-        return "REBOOT REQUIRED", "The default boot kernel is installed but differs from the running kernel; no further package upgrade is necessarily needed.", "Review the boot target and execute a guarded trial reboot in an approved maintenance window."
+        return "REBOOT REQUIRED", "The default boot kernel is installed but differs from the running kernel; no further package upgrade is necessarily needed.", "Review the boot target and allow a guarded trial reboot when authorized by configuration."
     if status == "outside-maintenance-window":
         if isinstance(updates, list) and updates:
             return "DEFERRED", "Read-only kernel check completed; installation skipped outside the maintenance window.", "Review available updates; installation is deferred until an authorized window."
