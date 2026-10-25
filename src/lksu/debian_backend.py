@@ -10,7 +10,10 @@ import subprocess
 RELEASE = re.compile(r"^[A-Za-z0-9._+~-]+$")
 
 
-class DebianKernelError(RuntimeError):
+from .core import LKSUError
+
+
+class DebianKernelError(LKSUError):
     pass
 
 
