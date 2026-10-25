@@ -57,6 +57,8 @@ def install_kernel(distro_id, running_release, *, flavor="generic", runner=subpr
         raise DebianKernelError("Invalid running kernel release")
     package = kernel_package(distro_id, flavor)
     before = boot_images()
+    if not pathlib.Path("/usr/sbin/update-grub").exists() and not pathlib.Path("/usr/bin/update-grub").exists():
+        raise DebianKernelError("GRUB update utility missing; unsupported bootloader")
     if running_release not in before:
         raise DebianKernelError("Running kernel boot image is absent")
     for args in (["apt-get", "update", "-qq"],
