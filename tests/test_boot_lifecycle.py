@@ -93,6 +93,18 @@ class BootLifecycleTests(unittest.TestCase):
         adopt.assert_called_once()
         trial.assert_called_once()
 
+    def test_missing_recovery_blocks_reboot_but_keeps_completed_install(self):
+        cfg = {"automatic_updates": True, "automatic_reboot": True, "policy": "all-stable", "recovery_ready": False}
+        completed_install = {"status": "installed-awaiting-manual-reboot", "running": "old", "new_default": "/boot/vmlinuz-new"}
+        with patch.object(core, "pending_update", return_value=None), patch.object(
+            core, "apply", return_value=completed_install
+        ), patch.object(core, "stage_trial_boot") as trial:
+            result, reboot = core.maintenance(cfg)
+        self.assertFalse(reboot)
+        self.assertEqual(result["status"], "reboot-blocked")
+        self.assertIn("snapshot", result["reboot_block_reason"])
+        trial.assert_not_called()
+
     def test_no_unattended_reboot_without_reboot_opt_in(self):
         cfg = {"automatic_updates": True, "automatic_reboot": False, "policy": "all-stable"}
         with patch.object(core, "pending_update", return_value=None), patch.object(
