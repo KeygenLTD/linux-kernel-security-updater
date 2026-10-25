@@ -66,7 +66,7 @@ The providers' free-plan allowances and approval policies can change. Check [Pos
 
 ### Option A — Postmark, step by step
 
-1. Visit **[Postmark sign-up](https://account.postmarkapp.com/sign_up)**, create an account and confirm the registration email.
+1. Visit **[Postmark sign-up](https://account.postmarkapp.com/sign_up)**, create an account (the form asks for a work email) and confirm the registration email.
 2. In Postmark, select an existing **Server** or create one called something like `LKSU alerts`. (A Postmark "Server" is a dashboard grouping; it is **not** a VPS you need to set up.)
 3. Verify the email address you intend to put in LKSU's **Report email** field:
    - Go to **Sender Signatures** and add/verify a **Sender Signature** for that exact address; follow the confirmation message.
@@ -86,7 +86,7 @@ LKSU automatically uses **`smtp.postmarkapp.com`**, **port `587`** and **STARTTL
 
 ### Option B — SMTP2GO, step by step
 
-1. Open **[SMTP2GO](https://www.smtp2go.com/)**, create an account and verify the registration email.
+1. Open **[SMTP2GO](https://www.smtp2go.com/)**, create an account using an email address on a domain you control (its current signup form does **not** accept public Gmail/Yahoo addresses) and verify the registration email. Complete any requested account/phone verification.
 2. In its dashboard go to **Sending → Verified Senders → Sender domains**. Add the domain you own, e.g. `example.com`.
 3. SMTP2GO will show the **DNS CNAME records** needed to authenticate that domain. Open the DNS settings at your domain provider (such as Cloudflare), create the records **exactly as shown**, and return to SMTP2GO to verify the sender domain. See [the official verified-sender guide](https://support.smtp2go.com/hc/en-gb/articles/115004408567-Verified-Senders). Domain verification may take some time.
 4. Go to **Sending → SMTP Users**, choose **Add SMTP user**, and create a dedicated user such as `lksu-alerts` with a strong unique password. This is **not** the password used to log in to the SMTP2GO website. Save the SMTP username and password somewhere secure. See [the official SMTP User guide](https://support.smtp2go.com/hc/en-gb/articles/13645646122777-SMTP-User-Authentication).
@@ -100,6 +100,19 @@ LKSU automatically uses **`smtp.postmarkapp.com`**, **port `587`** and **STARTTL
    ```
 
 LKSU automatically uses **`mail.smtp2go.com`**, **port `587`**, **STARTTLS**. You do **not** have to create a mail server on the VPS. The SMTP2GO [official connection guide](https://www.smtp2go.com/setup/) lists alternate ports in case outbound port 587 is blocked. Since LKSU's built-in SMTP2GO option fixes port 587, an alternate port requires choosing **custom** instead.
+
+### Adding sender DNS records in Cloudflare (Postmark or SMTP2GO)
+
+If your domain's DNS is managed by **Cloudflare**, this is where you enter the verification records shown by your email provider:
+
+1. Sign in to **[Cloudflare Dashboard](https://dash.cloudflare.com/)**.
+2. Choose your **domain**, then go to **DNS → Records**.
+3. In another tab, keep Postmark's **Domain / DNS Settings** or SMTP2GO's **Verified Senders** screen open. It shows each record's **Type**, **Name/Host** and **Value/Target**.
+4. Select **Add record** in Cloudflare. Choose **TXT** or **CNAME** exactly as specified by your email provider. Paste the exact **Name** and **Content** values it displays, then save. For CNAME verification records, use **DNS only** rather than the orange proxied cloud when that option is offered.
+5. Repeat for the other verification records your provider requires. **Do not delete or replace existing MX, SPF, DKIM or unrelated records.** If a conflicting record already exists, stop and consult your mail provider's guidance instead of blindly overwriting it.
+6. Return to Postmark/SMTP2GO and click **Verify / Check DNS**. DNS verification is not always immediate; retry after DNS propagation. Do not proceed until the required sender/domain shows as verified.
+
+**You do not need to transfer your domain, change its nameservers or move your mailbox to Postmark/SMTP2GO.** Verifying a sending domain generally only adds the required DNS authentication records.
 
 ### Option C — Your existing email provider (custom SMTP)
 
