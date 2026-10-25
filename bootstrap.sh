@@ -37,6 +37,23 @@ else
   echo "Interactive terminal is required for LKSU configuration." >&2
   exit 1
 fi
+if python3 - <<'PY'
+import json
+cfg=json.load(open('/etc/lksu/config.json'))
+raise SystemExit(0 if cfg.get('automatic_reboot') and not cfg.get('recovery_ready', False) else 1)
+PY
+then
+  echo "Automatic reboot requires a verified external snapshot, provider console access, and health checks."
+  if [[ -r /dev/tty ]]; then
+    if read -r -p "Configure reboot safeguards now? [y/N]: " reply </dev/tty; then
+      case "${reply,,}" in
+        y|yes) /usr/local/bin/lksu configure-automation </dev/tty >/dev/tty ;;
+      esac
+    fi
+  fi
+fi
+
+
 echo "Enabling LKSU monitoring and verification services."
 systemctl enable --now lksu.timer
 systemctl enable --now lksu-security-watch.timer
@@ -56,21 +73,6 @@ else
   echo "Kernel maintenance timer disabled by configuration."
 fi
 
-if python3 - <<'PY'
-import json
-cfg=json.load(open('/etc/lksu/config.json'))
-raise SystemExit(0 if cfg.get('automatic_reboot') and not cfg.get('recovery_ready', False) else 1)
-PY
-then
-  echo "Automatic reboot requires a verified external snapshot, provider console access, and health checks."
-  if [[ -r /dev/tty ]]; then
-    if read -r -p "Configure reboot safeguards now? [y/N]: " reply </dev/tty; then
-      case "${reply,,}" in
-        y|yes) /usr/local/bin/lksu configure-automation </dev/tty >/dev/tty ;;
-      esac
-    fi
-  fi
-fi
 
 # One immediate, real kernel update attempt on first setup. The completion
 # marker prevents reinstalls from unexpectedly bypassing maintenance windows.
