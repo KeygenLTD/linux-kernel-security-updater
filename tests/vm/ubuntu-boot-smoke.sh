@@ -58,4 +58,31 @@ if [[ "$ready" != 1 ]]; then
   exit 1
 fi
 echo "QEMU $EXPECTED_DISTRO guest boot and running kernel verification passed."
-echo "No kernel installation, GRUB modification or reboot was attempted."
+# Compare guest boot IDs before and after a genuine system reboot.
+ssh_opts=(-i "$workdir/id_ed25519" -o StrictHostKeyChecking=no
+  -o UserKnownHostsFile=/dev/null -o ConnectTimeout=3 -o BatchMode=yes -p 22222)
+old_boot_id="$(ssh "${ssh_opts[@]}" lksutest@127.0.0.1 'cat /proc/sys/kernel/random/boot_id')"
+[[ "$old_boot_id" =~ ^[a-f0-9-]{36}$ ]] || { echo "Cannot read guest boot identifier" >&2; exit 1; }
+ssh "${ssh_opts[@]}" lksutest@127.0.0.1 'sudo systemctl reboot' >/dev/null 2>&1 || true
+rebooted=0
+for attempt in $(seq 1 90); do
+  if ! kill -0 "$qemu_pid" 2>/dev/null; then
+    echo "QEMU guest died during reboot" >&2
+    exit 1
+  fi
+  new_boot_id="$(ssh "${ssh_opts[@]}" lksutest@127.0.0.1 'cat /proc/sys/kernel/random/boot_id' 2>/dev/null || true)"
+  if [[ "$new_boot_id" =~ ^[a-f0-9-]{36}$ ]] && [[ "$new_boot_id" != "$old_boot_id" ]]; then
+    if ssh "${ssh_opts[@]}" lksutest@127.0.0.1 "grep -qx 'ID=$EXPECTED_DISTRO' /etc/os-release && test -d /sys/module && uname -r" 2>/dev/null; then
+      rebooted=1
+      break
+    fi
+  fi
+  sleep 5
+done
+if [[ "$rebooted" != 1 ]]; then
+  echo "Guest did not complete verified reboot with a changed boot ID" >&2
+  exit 1
+fi
+echo "Verified $EXPECTED_DISTRO guest reboot: boot ID changed and guest kernel is running."
+echo "No kernel package installation, kernel selection or rollback occurred."
+
