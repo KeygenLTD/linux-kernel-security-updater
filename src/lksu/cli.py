@@ -166,17 +166,25 @@ def configure_automation():
             raise core.LKSUError("Invalid install policy")
         cfg["policy"] = policy
     if reboot:
-        if not cfg.get("services") and not cfg.get("health_urls"):
-            detected = detect_active_host_services()
-            choices = ", ".join(detected) if detected else "none"
-            print("Detected running application services: " + choices)
-            names = input("Services to check before and after reboot (comma separated, Enter for detected): ").strip()
-            parsed = [x.strip() for x in names.split(",") if x.strip()] if names else detected
-            if any(not re.fullmatch(r"[A-Za-z0-9_.@-]+", x) for x in parsed):
-                raise core.LKSUError("Invalid service name")
-            cfg["services"] = parsed
-            if parsed:
-                print("Configured reboot health checks: " + ", ".join(parsed))
+        current_services = list(cfg.get("services") or [])
+        if current_services:
+            print("Current reboot health checks: " + ", ".join(current_services))
+            defaults = current_services
+        else:
+            defaults = detect_active_host_services()
+            print("Detected running application services: " + (", ".join(defaults) if defaults else "none"))
+        names = input(
+            "Services to check before and after reboot (comma separated, Enter to keep suggestions; 'none' for URL-only): "
+        ).strip()
+        parsed = (
+            [] if names.lower() == "none" else
+            [x.strip() for x in names.split(",") if x.strip()] if names else defaults
+        )
+        if any(not re.fullmatch(r"[A-Za-z0-9_.@-]+", x) for x in parsed):
+            raise core.LKSUError("Invalid service name")
+        cfg["services"] = parsed
+        if parsed:
+            print("Configured reboot health checks: " + ", ".join(parsed))
         validate_reboot_health_checks(cfg.get("services"), cfg.get("health_urls"))
         cfg["recovery_ready"] = yes_no(
             "Have you verified a current external snapshot AND provider console recovery?",
