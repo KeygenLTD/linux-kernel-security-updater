@@ -39,6 +39,8 @@ See [platform coverage and safety gates](docs/platform-support.md) for CloudLinu
 
 ## Multi-distribution roadmap (in development)
 
+Run `lksu kernel-inventory --json` for a **read-only installed-kernel inventory** on Ubuntu/Debian and RPM-family hosts. It does not install or reboot anything. The Ubuntu GitHub CI runner executes this command as a smoke test; it does not establish safe kernel upgrade capability.
+
 Run `lksu compatibility --json` to inspect the current Linux distribution and the
 available kernel/update/boot backend **without making system changes**.
 
