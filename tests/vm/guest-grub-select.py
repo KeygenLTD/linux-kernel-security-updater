@@ -17,9 +17,9 @@ def choose(release: str, config: str = "/boot/grub/grub.cfg") -> str:
         match = re.match(r"^(menuentry|submenu) ['\"]([^'\"]+)['\"]", stripped)
         if match:
             kind, label = match.groups()
-            entry_id = re.search(r"(?:--id|\\$menuentry_id_option)\\s+['\"]?([A-Za-z0-9._+~-]+)", stripped)
+            entry_id = re.search(r"(?:--id|\$menuentry_id_option)\s+['\"]?([A-Za-z0-9._+~-]+)", stripped)
             entries.append((kind, entry_id.group(1) if entry_id else label, depth))
-        if re.search(r"(?:^|\\s)(?:linux|linuxefi)\\s+\\S*vmlinuz-" + re.escape(release) + r"(?:\\s|$)", stripped):
+        if re.search(r"(?:^|\s)(?:linux|linuxefi)\s+\S*vmlinuz-" + re.escape(release) + r"(?:\s|$)", stripped):
             menu = ">".join(item[1] for item in entries if item[0] in ("submenu", "menuentry"))
             if not menu:
                 raise ValueError("Matched kernel without GRUB menu entry")
