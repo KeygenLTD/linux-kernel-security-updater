@@ -221,5 +221,53 @@ class ConsoleTests(unittest.TestCase):
         self.assertEqual(save.call_args.args[1]["services"], ["my-worker"])
 
 
+    @patch("lksu.cli.detect_active_host_services")
+    @patch("lksu.cli.core.run")
+    @patch("lksu.cli.core.save")
+    @patch("lksu.cli.core.config")
+    @patch("lksu.cli.os.geteuid", return_value=0)
+    @patch("builtins.input")
+    def test_replace_existing_service_health_checks_without_mail_reset(
+        self, prompt, _root, config, save, run, discover
+    ):
+        data = dict(CFG)
+        data.update({"services": ["old-service"], "health_urls": [],
+                     "automatic_reboot": True, "recovery_ready": True,
+                     "smtp_password": "retained"})
+        config.return_value = data
+        prompt.side_effect = lambda label: (
+            "nginx,custom-worker" if label.startswith("Services to check") else ""
+        )
+        with contextlib.redirect_stdout(io.StringIO()):
+            cli.configure_automation()
+        saved = save.call_args.args[1]
+        self.assertEqual(saved["services"], ["nginx", "custom-worker"])
+        self.assertEqual(saved["smtp_password"], "retained")
+        discover.assert_not_called()
+        self.assertIn(
+            ("systemctl", "enable", "--now", "lksu-maintenance.timer"),
+            [call.args for call in run.call_args_list],
+        )
+
+    @patch("lksu.cli.detect_active_host_services", return_value=[])
+    @patch("lksu.cli.core.run")
+    @patch("lksu.cli.core.save")
+    @patch("lksu.cli.core.config")
+    @patch("lksu.cli.os.geteuid", return_value=0)
+    @patch("builtins.input")
+    def test_url_only_health_checks_allowed_with_no_services(
+        self, prompt, _root, config, save, run, discover
+    ):
+        data = dict(CFG)
+        data.update({"services": [], "health_urls": [{"url": "https://example.net/health", "status": 200}],
+                     "automatic_reboot": True, "recovery_ready": True})
+        config.return_value = data
+        prompt.side_effect = lambda label: "none" if label.startswith("Services to check") else ""
+        with contextlib.redirect_stdout(io.StringIO()):
+            cli.configure_automation()
+        self.assertEqual(save.call_args.args[1]["services"], [])
+
+
+
 if __name__ == "__main__":
     unittest.main()
