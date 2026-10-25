@@ -2,17 +2,17 @@
 
 ![LKSU kernel update, verification and fallback illustration](docs/assets/lksu-hero.png)
 
-> **Status: v0.3.13 early preview.** Unit tested, but not yet integration tested across AlmaLinux 8/9/10, BIOS/UEFI, DNF and GRUB combinations. Do not activate automatic installation or reboot on production hosts until those checks and a provider-console recovery drill pass.
+> **Status: v0.3.14 early preview.** Unit tested, but not yet integration tested across AlmaLinux 8/9/10, BIOS/UEFI, DNF and GRUB combinations. Do not activate automatic installation or reboot on production hosts until those checks and a provider-console recovery drill pass.
 
-Early production-oriented release for **AlmaLinux 8, 9 and 10**. LKSU uses the distribution's enabled DNF repositories. It does not enable testing repositories, select a CVE-specific build, download arbitrary RPMs, or reboot a machine automatically.
+Early production-oriented release for **AlmaLinux 8, 9 and 10**. LKSU uses the distribution's enabled DNF repositories. It does not enable testing repositories, select a CVE-specific build, or download arbitrary RPMs. It requests automatic reboot only after opt-in and safety checks.
 
 ## Safety model
 
-- Default policy is `check-only`. The scheduled timer checks daily and emails a report.
+- Default policy is `check-only`. The scheduled timer checks daily without email when there is no actual update action or failure.
 - `security-only` reads DNF security updateinfo and reports advisory IDs, severity, affected kernel packages and CVEs. `all-stable` permits all kernel updates from enabled repositories.
 - Before installation LKSU checks AlmaLinux version, root privileges, required tools, `/boot` free space, a GRUB configuration, the running kernel's image, and its installed RPM. Its disk threshold is 500 MiB; host-specific layouts may require more.
 - Installation overrides DNF's `installonly_limit` to preserve installed kernels. LKSU checks that the running kernel's RPM and boot image still exist, then records the previous kernel. It does **not** create a full boot, VM, filesystem, or data backup.
-- Maintenance windows use an explicit local start time and duration. Installation and reboot are separate operations; automatic reboot defaults to disabled.
+- Maintenance windows use an explicit local start time and duration. Installation and reboot are separate operations; automatic reboot is offered during first setup, and cannot run without explicit provider recovery and health readiness.
 - A trial reboot keeps the old kernel as the persistent GRUB default and selects the new kernel once with `grub2-reboot`. Successful service and HTTP/HTTPS health checks promote the new kernel.
 - Agents can send HMAC-signed reports over HTTPS to the SQLite-backed `lksu-fleet` collector and bearer-token-protected web dashboard.
 - Optional Security Watch reports LKSU/config integrity changes, inactive configured security services, non-enforcing SELinux, repeated SSH failures and successful root SSH logins. It never edits files, blocks addresses or removes users.
@@ -37,10 +37,10 @@ systemctl list-timers lksu.timer
 
 ## One-command setup (recommended)
 
-For a pinned GitHub release on AlmaLinux 8/9/10 (after the v0.3.13 release is published):
+For a pinned GitHub release on AlmaLinux 8/9/10 (after the v0.3.14 release is published):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/KeygenLTD/linux-kernel-security-updater/v0.3.13/bootstrap.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/KeygenLTD/linux-kernel-security-updater/v0.3.14/bootstrap.sh | sudo bash
 ```
 
 This installs LKSU, asks for the report email and provider settings, configures timers, and immediately attempts an eligible kernel installation if automatic updates are selected. A trial reboot can occur when explicitly enabled and after every recovery and health gate passes.
@@ -49,7 +49,7 @@ This installs LKSU, asks for the report email and provider settings, configures 
 
 **Two independent update channels:** The existing daily `lksu scheduled` job reports on kernel RPMs without making changes. `lksu-maintenance.timer` (when explicitly enabled) checks every 15 minutes and only installs kernel RPM upgrades inside its configured window. When the latest installed GRUB default differs from the running kernel, LKSU now reports **REBOOT REQUIRED** even when DNF says 0 upgrades. During a maintenance window, it can adopt an already-installed *newer* default kernel after validating the kernel-core RPMs, boot images, initramfs, native RPM version ordering and GRUB entries.
 
-**Unattended kernel reboots are guarded:** Before LKSU stages a one-shot GRUB trial reboot, it requires `automatic_reboot=true`, `recovery_ready=true` (manual confirmation of an external snapshot and functional provider console), at least one configured and passing service or HTTP health check, and an enabled `lksu-verify.service`. The old kernel stays the persistent default until post-boot verification succeeds. A failure requires investigation; a preserved kernel alone is not a full server snapshot. Existing `/var/lib/lksu/state.json` entries awaiting verification block repeat installation, and trials are not automatically repeated. The installer enables the verify **service**, but does not force or schedule a reboot.
+**Unattended kernel reboots are guarded:** Before LKSU stages a one-shot GRUB trial reboot, it requires `automatic_reboot=true`, `recovery_ready=true` (manual confirmation of an external snapshot and functional provider console), at least one configured and passing service or HTTP health check, and an enabled `lksu-verify.service`. The old kernel stays the persistent default until post-boot verification succeeds. A failure requires investigation; a preserved kernel alone is not a full server snapshot. Existing `/var/lib/lksu/state.json` entries awaiting verification block repeat installation, and trials are not automatically repeated. The installer enables the verification **service**; after setup the authorized kernel maintenance process automatically stages and requests a reboot when safety checks pass.
 
 **LKSU itself can update automatically, independently of kernel updates.** Daily `lksu-self-update.timer` invokes `lksu self-update-scheduled`. It is inert until `automatic_lksu_updates=true` is explicitly set in root-owned `/etc/lksu/config.json` (file mode 0600). Once enabled, LKSU checks the repository's latest non-draft GitHub Release and installs a newer version only when it has an exact-match wheel asset and GitHub-provided SHA-256 digest. It rejects mismatches, unrecognized URLs, pre-releases, unsigned-by-digest assets and downgrades. New versions are staged in separate virtual environments under `/opt/lksu/releases/` and activated through `/opt/lksu/current`; old releases and the original binary entrypoints are kept for recovery. Wheel digest verification establishes artifact integrity against GitHub's release metadata; it is **not** independent publisher-code signing. Protect repository/release permissions accordingly.
 
@@ -83,11 +83,17 @@ For a **new installation**, the interactive `lksu configure` setup asks whether 
 
 `sudo lksu configure-self-update` changes just that self-update preference, avoiding the need to enter mail credentials again. The installer provisions the daily self-update timer automatically. A new release must still be published as a GitHub Release wheel, pass digest checks, and have a version newer than the one running before it can be activated. LKSU kernel auto-install and reboot settings remain separate.
 
+## Event-only email notifications (v0.3.14)
+
+LKSU checks and maintenance-window skips run **silently**: no email for successful read-only scans, no RPM upgrades, no self-update available, or unchanged software releases. Emails are sent only after an actual kernel installation, a staged kernel transition, successful post-reboot verification, a real LKSU application upgrade, an attempted installation/reboot error, or a failed verification. Repeated identical failures and updates are deduplicated using persistent `/var/lib/lksu/notifications.json` state; logs and fleet telemetry remain available. If SMTP fails, LKSU does not mark the message delivered and can retry on a later matching event. A server which cannot boot or has lost internet cannot send its own alert: use independent provider monitoring for that case.
+
+The first-install wizard asks `Email only when updates succeed or fail?`, default **yes**, and offers guarded automatic reboot by default. It still requires explicit recovery readiness and passing real service/HTTP checks before first automatic reboot. After one-time configuration, **no manual SSH reboot command** is needed during normal eligible updates. Existing installations retain their automation settings, which can be adjusted once using `sudo lksu configure-automation` without re-entering SMTP credentials. LKSU cannot manufacture a provider snapshot or prove remote-console access.
+
 ## Email reports
 
 LKSU notification emails are written in English, with an operator-readable subject and plain-text summary instead of raw JSON. They include the host, report timestamp, running and installed kernels (when RPM data can be read), update/advisory counts, policy, maintenance settings, and recorded rollback kernel verification status. Counts that were not checked say **Not checked**, not zero. The next systemd check time is intentionally reported as undetermined rather than guessed.
 
-A `maintenance` invocation outside its configured window does **not** install or reboot: it performs a read-only kernel check and explains why installation was deferred. An enabled maintenance timer runs every 15 minutes, so with `notifications=true` it may send frequent status messages; disable that timer or tune notifications if you do not want that volume. The separate daily `scheduled` check also provides a report. Failed scheduled operations attempt to send an English error report; SMTP delivery errors are not retried recursively.
+A `maintenance` invocation outside its configured window does **not** install or reboot: it performs a read-only kernel check and explains why installation was deferred in the local log, without sending email. An enabled maintenance timer runs every 15 minutes, but routine checks stay silent and repeated errors are deduplicated. The separate daily `scheduled` check records its result locally/fleet-side without email; errors of read-only scans are logged, whereas failed attempted updates trigger an English event email.
 
 The preserved previous kernel is **not** a full system backup. Mail never claims successful rollback without proving it.
 

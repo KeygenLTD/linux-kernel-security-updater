@@ -74,7 +74,7 @@ class InitialInstallTests(unittest.TestCase):
             self.assertEqual(cli.main(["initialize"]), 0)
         initial.assert_called_once()
         self.assertIn("Package upgrades:", buffer.getvalue())
-        send.assert_called_once()
+        send.assert_not_called()
         fleet.assert_called_once()
 
     @patch("lksu.cli.core.kernel_operation_lock")

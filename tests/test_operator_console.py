@@ -95,7 +95,7 @@ class ConsoleTests(unittest.TestCase):
         self.assertEqual(data["policy"], "all-stable")
         self.assertTrue(data["automatic_lksu_updates"])
         self.assertTrue(data["maintenance_window"]["enabled"])
-        self.assertFalse(data["automatic_reboot"])
+        self.assertTrue(data["automatic_reboot"])
         self.assertFalse(data["recovery_ready"])
         self.assertEqual(data["smtp_password"], "dedicated-token")
 
