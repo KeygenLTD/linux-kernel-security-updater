@@ -47,7 +47,7 @@ for attempt in $(seq 1 90); do
   if ssh -i "$workdir/id_ed25519" -o StrictHostKeyChecking=no \
        -o UserKnownHostsFile=/dev/null -o ConnectTimeout=3 \
        -o BatchMode=yes -p 22222 lksutest@127.0.0.1 \
-       "test \\$(id -u) -ne 0 && grep -qx 'ID=$EXPECTED_DISTRO' /etc/os-release && uname -r && test -d /sys/module" 2>/dev/null; then
+       "id -u | grep -qxv 0 && grep -qx 'ID=$EXPECTED_DISTRO' /etc/os-release && uname -r && test -d /sys/module" 2>/dev/null; then
     ready=1
     break
   fi
