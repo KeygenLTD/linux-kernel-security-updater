@@ -13,10 +13,10 @@ def distro(identifier, family, manager):
 
 class KernelInventoryTests(unittest.TestCase):
     def test_apt_inventory_ignores_removed_and_non_kernel_packages(self):
-        output = ("linux-image-6.8.0-52-generic install ok installed 6.8.0-52.53\\n"
-                  "linux-image-generic install ok installed 6.8.0.52.52\\n"
-                  "linux-image-6.1.0-1-amd64 deinstall ok config-files 6.1.0-1\\n"
-                  "other-package install ok installed 1.0\\n")
+        output = ("linux-image-6.8.0-52-generic install ok installed 6.8.0-52.53\n"
+                  "linux-image-generic install ok installed 6.8.0.52.52\n"
+                  "linux-image-6.1.0-1-amd64 deinstall ok config-files 6.1.0-1\n"
+                  "other-package install ok installed 1.0\n")
         proc = SimpleNamespace(returncode=0, stdout=output, stderr="")
         with patch.object(core, "run", return_value=proc) as runner, patch.object(core.os, "uname", return_value=SimpleNamespace(release="6.8.0-52-generic")):
             result = apt_inventory(distro("ubuntu", "debian", "apt/dpkg"))
@@ -26,10 +26,10 @@ class KernelInventoryTests(unittest.TestCase):
         self.assertTrue(runner.call_args.kwargs["check"] is False)
 
     def test_rpm_inventory_reports_kernel_without_mutation(self):
-        output = ("kernel-core 5.14.0-1.el9.x86_64\\n"
-                  "kernel-uek 5.15.0-1.el9.x86_64\\n"
-                  "kernel-lve 4.18.0-1.el8.x86_64\\n"
-                  "bash 5.0-1.x86_64\\n")
+        output = ("kernel-core 5.14.0-1.el9.x86_64\n"
+                  "kernel-uek 5.15.0-1.el9.x86_64\n"
+                  "kernel-lve 4.18.0-1.el8.x86_64\n"
+                  "bash 5.0-1.x86_64\n")
         with patch.object(core, "run", return_value=SimpleNamespace(returncode=0, stdout=output, stderr="")), patch.object(core.os, "uname", return_value=SimpleNamespace(release="5.14.0")):
             result = rpm_inventory(distro("cloudlinux", "cloudlinux", "dnf/rpm"))
         self.assertEqual({p["name"] for p in result["installed_kernel_packages"]}, {"kernel-core", "kernel-uek", "kernel-lve"})
