@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-RELEASE="v0.3.17"
+RELEASE="v0.3.18"
 REPO="KeygenLTD/linux-kernel-security-updater"
 ARCHIVE="https://github.com/${REPO}/archive/refs/tags/${RELEASE}.tar.gz"
 [[ "${EUID}" -eq 0 ]] || { echo "Run with sudo" >&2; exit 1; }
@@ -59,23 +59,13 @@ systemctl enable --now lksu.timer
 systemctl enable --now lksu-security-watch.timer
 systemctl enable lksu-verify.service
 systemctl enable --now lksu-self-update.timer
-if python3 - <<'PY'
-import json
-cfg=json.load(open('/etc/lksu/config.json'))
-window=cfg.get('maintenance_window')
-configured=isinstance(window, dict) and isinstance(window.get('enabled'), bool)
-raise SystemExit(0 if configured and (cfg.get('automatic_updates') or cfg.get('automatic_reboot')) else 1)
-PY
-then
-  systemctl enable --now lksu-maintenance.timer
-else
-  systemctl disable --now lksu-maintenance.timer 2>/dev/null || true
-  echo "Kernel maintenance timer disabled by configuration."
-fi
+# A read-only 15-minute assessment runs even when automatic installation is disabled.
+# Existing automatic install/reboot preferences remain authoritative.
+systemctl enable --now lksu-maintenance.timer
 
 
 # One immediate, real kernel update attempt on first setup. The completion
-# marker prevents reinstalls from unexpectedly bypassing maintenance windows.
+# marker prevents reinstalls from repeating real kernel installations or reboots.
 if [[ ! -e /var/lib/lksu/initial-run.json ]]; then
   echo "First kernel update run: installing eligible RPMs immediately when authorized."
   if ! /usr/local/bin/lksu initialize; then

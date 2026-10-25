@@ -1,5 +1,4 @@
-"""Advisory classification and maintenance-window decisions."""
-from datetime import datetime, time, timedelta
+"""Kernel security advisory classification."""
 import re
 
 from .core import LKSUError, run
@@ -40,24 +39,3 @@ def security_advisories():
         result.append({"warning": warning})
     return result
 
-
-def in_maintenance_window(config, now=None):
-    window = config.get("maintenance_window")
-    # An explicitly disabled time restriction permits 24/7 maintenance.
-    # Missing/malformed configuration must not accidentally authorize reboot.
-    if not isinstance(window, dict) or not window:
-        return False
-    if window.get("enabled", True) is False:
-        return True
-    try:
-        hour, minute = map(int, window["start"].split(":"))
-        duration = int(window.get("duration_minutes", 60))
-    except (KeyError, TypeError, ValueError):
-        raise LKSUError("Invalid maintenance_window configuration")
-    if not (0 <= hour <= 23 and 0 <= minute <= 59 and 1 <= duration <= 720):
-        raise LKSUError("Maintenance window is outside allowed bounds")
-    current = now or datetime.now().astimezone()
-    start = datetime.combine(current.date(), time(hour, minute), tzinfo=current.tzinfo)
-    if current < start:
-        start -= timedelta(days=1)
-    return start <= current < start + timedelta(minutes=duration)

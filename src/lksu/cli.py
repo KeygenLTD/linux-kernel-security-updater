@@ -11,7 +11,6 @@ from email.message import EmailMessage
 
 from . import core
 from .fleet import send_report as send_fleet_report
-from .policy import in_maintenance_window
 from .reporting import build_email_report, format_console_report
 from .security import check as security_check, create_baseline
 from . import self_update, notifications
@@ -103,9 +102,6 @@ def setup():
     automatic_lksu_updates = yes_no("Automatically install verified LKSU releases?", True)
     notify_events = yes_no("Email only when updates succeed or fail?", True)
     automatic_reboot = yes_no("Automatically reboot after installing a kernel when recovery checks pass?", True)
-    use_window = yes_no("Restrict automatic kernel installations and reboots to a maintenance window?", False)
-    start = input("Maintenance start [03:00]: ").strip() or "03:00" if use_window else "03:00"
-    duration = int(input("Maintenance duration in minutes [60]: ").strip() or "60") if use_window else 60
     default_policy = "all-stable" if automatic_updates else "check-only"
     policy = input(
         f"Install policy [check-only/security-only/all-stable] (default {default_policy}): "
@@ -136,7 +132,6 @@ def setup():
                             "automatic_updates": automatic_updates, "automatic_lksu_updates": automatic_lksu_updates,
                             "recovery_ready": recovery_ready, "notifications": notify_events,
                             "automatic_reboot": automatic_reboot,
-                            "maintenance_window": {"enabled": use_window, "start": start, "duration_minutes": duration},
                             "security_watch": {"required_services": ["auditd", "firewalld"],
                                                "require_selinux_enforcing": True,
                                                "ssh_failure_threshold": 5,
@@ -152,16 +147,9 @@ def configure_automation():
     cfg = core.config()
     update = yes_no("Automatically install kernel updates?", cfg.get("automatic_updates", False))
     reboot = yes_no("Automatically reboot after eligible kernel updates?", cfg.get("automatic_reboot", False))
-    window = dict(cfg.get("maintenance_window") or {})
-    enabled = yes_no("Restrict automatic kernel updates and reboots to a maintenance window?", window.get("enabled", True))
-    start = window.get("start", "03:00")
-    duration = window.get("duration_minutes", 60)
-    if enabled:
-        start = input(f"Maintenance start [{start}]: ").strip() or start
-        duration = int(input(f"Maintenance duration in minutes [{duration}]: ").strip() or str(duration))
     cfg["automatic_updates"] = update
     cfg["automatic_reboot"] = reboot
-    cfg["maintenance_window"] = {"enabled": enabled, "start": start, "duration_minutes": duration}
+    cfg.pop("maintenance_window", None)  # Never reintroduce legacy scheduling restrictions.
     if update and cfg.get("policy") == "check-only":
         policy = input("Kernel install policy [security-only/all-stable] (default all-stable): ").strip() or "all-stable"
         if policy not in {"security-only", "all-stable"}:
@@ -194,19 +182,10 @@ def configure_automation():
         )
     else:
         cfg["recovery_ready"] = False
-    from .policy import in_maintenance_window
-    # Validate the schedule, but do not require it to be open now.
-    if enabled:
-        from datetime import datetime
-        in_maintenance_window(cfg, datetime.now().astimezone())
     core.save(core.CONFIG, cfg)
-    if update or reboot:
-        core.run("systemctl", "enable", "--now", "lksu-maintenance.timer")
-    else:
-        core.run("systemctl", "disable", "--now", "lksu-maintenance.timer")
-    print("Kernel automation preferences and maintenance timer saved; SMTP settings preserved.")
-    if (update or reboot) and not enabled:
-        print("24/7 mode: eligible kernel updates and guarded reboots may run at any 15-minute timer check.")
+    core.run("systemctl", "enable", "--now", "lksu-maintenance.timer")
+    print("Kernel automation preferences saved; SMTP and recovery settings preserved.")
+    print("24/7 kernel checks: every 15 minutes. Install and guarded reboot require their configured opt-ins.")
 
 
 
@@ -288,15 +267,9 @@ def main(argv=None):
         elif args.command == "scheduled":
             result = core.check()
         elif args.command == "maintenance":
-            if not in_maintenance_window(cfg):
-                # Collect a read-only assessment even when installation is deferred.
-                result = {"status": "outside-maintenance-window", **core.check()}
-            else:
-                with core.kernel_operation_lock():
-                    result, reboot_requested = core.maintenance(cfg)
+            with core.kernel_operation_lock():
+                result, reboot_requested = core.maintenance(cfg)
         elif args.command == "stage-reboot":
-            if not in_maintenance_window(cfg):
-                raise core.LKSUError("Outside configured maintenance window")
             with core.kernel_operation_lock():
                 if cfg.get("automatic_reboot"):
                     core.auto_reboot_preflight(cfg)

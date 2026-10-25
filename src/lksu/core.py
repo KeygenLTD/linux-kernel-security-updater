@@ -49,7 +49,13 @@ def config():
         raise LKSUError("Run 'lksu configure' first")
     if CONFIG.stat().st_mode & 0o077:
         raise LKSUError("Config must be readable only by root (chmod 600)")
-    return json.loads(CONFIG.read_text())
+    cfg = json.loads(CONFIG.read_text())
+    # v0.3.18: retire legacy time restrictions, without altering any other key.
+    # Atomic save preserves root-only permissions and retains SMTP/recovery opt-ins.
+    if "maintenance_window" in cfg:
+        cfg.pop("maintenance_window")
+        save(CONFIG, cfg)
+    return cfg
 
 
 def save(path, value):
@@ -184,7 +190,7 @@ def verify(cfg):
         event("VERIFY", "Post-boot checks passed; new kernel confirmed and made persistent default.")
     else:
         event("VERIFY", "Post-boot verification failed. Old kernel remains the persistent fallback; operator review required.")
-        report["recommended_action"] = "Investigate failed checks. If rollback is required, confirm provider console access, run 'lksu select-old', verify grubby --default-kernel, then reboot in an approved window."
+        report["recommended_action"] = "Investigate failed checks. If rollback is required, confirm provider console access, run 'lksu select-old', verify grubby --default-kernel, then reboot with provider-console recovery available."
     return report
 
 
@@ -369,7 +375,7 @@ def auto_reboot_preflight(cfg):
 
 
 def maintenance(cfg):
-    """Install eligible updates or safely adopt a pre-installed kernel at maintenance time."""
+    """Check anytime; install only when authorized and stage guarded reboot."""
     state = pending_update()
     if state:
         result = check()
@@ -413,9 +419,8 @@ def maintenance(cfg):
 def initial_run(cfg):
     """Perform the first managed kernel update immediately after installer setup.
 
-    This is the sole bypass for the recurring maintenance window. Explicit
-    automatic_updates/automatic_reboot choices and reboot safety gates remain
-    mandatory. Persist the completion marker before any requested reboot.
+    Explicit automatic_updates/automatic_reboot choices and reboot safety gates
+    remain mandatory. Persist completion before any requested reboot.
     """
     if INITIAL_STATE.exists():
         event("INIT", "Initial setup action was already recorded; not repeating the first-install kernel transaction.")

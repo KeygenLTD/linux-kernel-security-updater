@@ -46,19 +46,6 @@ def _rollback_status(installed_kernels, result):
     return old + " (rollback availability NOT verified: RPM or boot image missing)"
 
 
-def _window_description(cfg):
-    window = cfg.get("maintenance_window")
-    if not isinstance(window, dict) or not window:
-        return "Not configured"
-    if window.get("enabled", True) is False:
-        return "Any time (15-minute checks)"
-    start = window.get("start")
-    duration = window.get("duration_minutes", 60)
-    if start is None:
-        return "Incomplete configuration"
-    return "Daily at {} server local time ({} minutes)".format(start, duration)
-
-
 def _outcome(command, result):
     status = result.get("status")
     updates = result.get("updates")
@@ -90,12 +77,6 @@ def _outcome(command, result):
         return "TRIAL BOOT STAGED", "One-shot trial boot was staged; the previous kernel remains the persistent fallback.", "Monitor host access and complete post-boot health verification."
     if result.get("reboot_required"):
         return "REBOOT REQUIRED", "The default boot kernel is installed but differs from the running kernel; no further package upgrade is necessarily needed.", "Review the boot target and allow a guarded trial reboot when authorized by configuration."
-    if status == "outside-maintenance-window":
-        if isinstance(updates, list) and updates:
-            return "DEFERRED", "Read-only kernel check completed; installation skipped outside the maintenance window.", "Review available updates; installation is deferred until an authorized window."
-        if isinstance(updates, list):
-            return "SKIPPED", "Read-only kernel check found no available package upgrades; maintenance action skipped.", "No immediate action indicated by this check."
-        return "SKIPPED", "Maintenance action skipped outside the configured window; update availability was not checked.", "Review the scheduled daily check before drawing conclusions."
     if status == "installed-awaiting-manual-reboot":
         return "REBOOT PENDING", "Kernel packages installed; the running kernel has not yet been verified after reboot.", "Yes - arrange a controlled reboot and run lksu verify after boot."
     if status == "no-security-updates":
@@ -178,8 +159,9 @@ def build_email_report(cfg, command, result, *, timestamp=None, hostname=None, o
         "",
         "Scheduling",
         "----------",
-        "Maintenance window: " + _window_description(cfg),
-        "Maintenance action: " + ("Skipped - outside maintenance window" if result.get("status") == "outside-maintenance-window" else "See operation and result above"),
+        "Kernel check interval: Every 15 minutes (24/7, when timer is enabled)",
+        "Automatic kernel installation: Requires automatic_updates and eligible policy",
+        "Unattended reboot: Requires opt-in and passing recovery/health checks",
         "Next scheduled check: Not determined here; inspect systemctl list-timers on the host.",
     ]
     removed = result.get("cleaned_old_kernels")
@@ -269,7 +251,7 @@ def format_console_report(cfg, command, result):
     if command in {"initialize", "check", "scheduled", "maintenance", "apply", "stage-reboot"}:
         lines.append("Kernel updates:   " + ("Enabled" if cfg.get("automatic_updates") else "Disabled"))
         lines.append("Automatic reboot: " + ("Enabled (subject to safety checks)" if cfg.get("automatic_reboot") else "Disabled"))
-        lines.append("Maintenance:      " + _window_description(cfg))
+        lines.append("Kernel checks:    Every 15 minutes (24/7 timer)")
     lines.append("LKSU self-update: " + ("Enabled" if cfg.get("automatic_lksu_updates") else "Disabled"))
     if isinstance(result.get("cleaned_old_kernels"), list) and result["cleaned_old_kernels"]:
         lines.append("Old kernels cleaned: " + ", ".join(

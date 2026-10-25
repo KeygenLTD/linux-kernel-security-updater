@@ -14,11 +14,6 @@
       "status": 200
     }
   ],
-  "maintenance_window": {
-    "enabled": false,
-    "start": "03:00",
-    "duration_minutes": 60
-  },
   "automatic_reboot": false,
   "security_watch": {
     "required_services": [
