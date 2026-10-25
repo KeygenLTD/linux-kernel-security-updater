@@ -74,7 +74,14 @@ if [[ "${KERNEL_UPGRADE_TEST:-0}" == 1 ]]; then
   ssh "${ssh_opts[@]}" lksutest@127.0.0.1 'sudo dpkg-query -W -f="${Status} ${Version}\\n" linux-image-amd64; test -s "/boot/vmlinuz-$(uname -r)"' >> guest-package-install.log 2>&1 || { echo "Kernel package or old running boot image missing" >&2; exit 1; }
 
   echo "Selecting new installed Debian generic kernel for trial boot."
-  target_kernel="$(ssh "${ssh_opts[@]}" lksutest@127.0.0.1 "find /boot -maxdepth 1 -name 'vmlinuz-*-amd64' -printf '%f\\n' | sed 's/^vmlinuz-//' | grep -v -- '-cloud-amd64
+  target_kernel="$(ssh "${ssh_opts[@]}" lksutest@127.0.0.1 "find /boot -maxdepth 1 -name 'vmlinuz-*-amd64' -printf '%f\\n' | sed 's/^vmlinuz-//' | grep -v -- '-cloud-amd64' | sort -V | tail -1")"
+  if [[ -z "$target_kernel" || "$target_kernel" == "$old_kernel" ]]; then
+    echo "No distinct Debian generic kernel available for trial." >&2
+    exit 1
+  fi
+  ssh "${ssh_opts[@]}" lksutest@127.0.0.1 'sudo update-grub' >> guest-package-install.log 2>&1 || { tail -80 guest-package-install.log; exit 1; }
+  ssh "${ssh_opts[@]}" lksutest@127.0.0.1 "sudo python3 - '$target_kernel'" < tests/vm/guest-grub-select.py >> guest-package-install.log 2>&1 || { tail -80 guest-package-install.log; exit 1; }
+  echo "Debian kernel $target_kernel staged for one-shot boot."
   ssh "${ssh_opts[@]}" lksutest@127.0.0.1 'find /boot -maxdepth 1 -name "vmlinuz-*" -type f -printf "%f\\n"' >> guest-package-install.log 2>&1
 
 fi
