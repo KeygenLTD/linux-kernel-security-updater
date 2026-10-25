@@ -1,5 +1,7 @@
 """Host checks and state transitions. No shell interpolation or implicit reboot."""
 import json
+import fcntl
+from contextlib import contextmanager
 import os
 import re
 import shutil
@@ -10,6 +12,7 @@ from pathlib import Path
 PACKAGES = ("kernel", "kernel-core", "kernel-modules", "kernel-modules-core", "kernel-modules-extra")
 STATE = Path("/var/lib/lksu/state.json")
 INITIAL_STATE = Path("/var/lib/lksu/initial-run.json")
+KERNEL_LOCK = Path("/run/lock/lksu-kernel.lock")
 CONFIG = Path("/etc/lksu/config.json")
 VERSION = re.compile(r"^[A-Za-z0-9._+~-]+$")
 
@@ -211,6 +214,22 @@ def select_old():
     if default_kernel() != image:
         raise LKSUError("Failed to verify old kernel as default")
     return image
+
+
+@contextmanager
+def kernel_operation_lock():
+    """Prevent concurrent systemd timer and installer kernel modifications."""
+    KERNEL_LOCK.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+    with KERNEL_LOCK.open("a+") as handle:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise LKSUError("Another LKSU kernel operation is running") from exc
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
 
 
 def pending_update():
