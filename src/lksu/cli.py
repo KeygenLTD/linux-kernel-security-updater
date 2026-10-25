@@ -187,7 +187,8 @@ def main(argv=None):
             return 0
         cfg = core.config()
         if args.command == "initialize":
-            result, reboot_requested = core.initial_run(cfg)
+            with core.kernel_operation_lock():
+                result, reboot_requested = core.initial_run(cfg)
         elif args.command == "self-update-check":
             result = self_update.check()
         elif args.command in {"self-update", "self-update-scheduled"}:
@@ -204,7 +205,8 @@ def main(argv=None):
         elif args.command == "apply":
             if os.geteuid():
                 raise core.LKSUError("Root required")
-            result = core.apply(cfg["policy"])
+            with core.kernel_operation_lock():
+                result = core.apply(cfg["policy"])
         elif args.command == "scheduled":
             result = core.check()
         elif args.command == "maintenance":
@@ -212,21 +214,25 @@ def main(argv=None):
                 # Collect a read-only assessment even when installation is deferred.
                 result = {"status": "outside-maintenance-window", **core.check()}
             else:
-                result, reboot_requested = core.maintenance(cfg)
+                with core.kernel_operation_lock():
+                    result, reboot_requested = core.maintenance(cfg)
         elif args.command == "stage-reboot":
             if not in_maintenance_window(cfg):
                 raise core.LKSUError("Outside configured maintenance window")
-            if cfg.get("automatic_reboot"):
-                core.auto_reboot_preflight(cfg)
-            result = core.stage_trial_boot()
+            with core.kernel_operation_lock():
+                if cfg.get("automatic_reboot"):
+                    core.auto_reboot_preflight(cfg)
+                result = core.stage_trial_boot()
             if cfg.get("automatic_reboot"):
                 reboot_requested = True
         elif args.command == "verify":
-            result = core.verify(cfg)
+            with core.kernel_operation_lock():
+                result = core.verify(cfg)
         else:
             if os.geteuid():
                 raise core.LKSUError("Root required")
-            result = {"old_default": core.select_old(), "rebooted": False}
+            with core.kernel_operation_lock():
+                result = {"old_default": core.select_old(), "rebooted": False}
         if args.json:
             print(json.dumps(result, indent=2))
         else:
