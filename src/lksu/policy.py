@@ -43,7 +43,7 @@ def security_advisories():
 
 def in_maintenance_window(config, now=None):
     window = config.get("maintenance_window")
-    if not window:
+    if not window or window.get("enabled", True) is False:
         return False
     try:
         hour, minute = map(int, window["start"].split(":"))

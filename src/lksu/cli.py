@@ -12,6 +12,7 @@ from email.message import EmailMessage
 from . import core
 from .fleet import send_report as send_fleet_report
 from .policy import in_maintenance_window
+from .reporting import build_email_report
 from .security import check as security_check, create_baseline
 
 
@@ -104,6 +105,8 @@ def main(argv=None):
     parser.add_argument("command", choices=("configure", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check"))
     args = parser.parse_args(argv)
     reboot_requested = False
+    report_attempted = False
+    cfg = None
     try:
         if args.command == "configure":
             setup()
@@ -125,7 +128,8 @@ def main(argv=None):
             result = core.check()
         elif args.command == "maintenance":
             if not in_maintenance_window(cfg):
-                result = {"status": "outside-maintenance-window"}
+                # Collect a read-only assessment even when installation is deferred.
+                result = {"status": "outside-maintenance-window", **core.check()}
             else:
                 result = core.apply(cfg["policy"]) if cfg.get("automatic_updates") and cfg["policy"] != "check-only" else core.check()
                 if cfg.get("automatic_reboot") and result.get("status") == "installed-awaiting-manual-reboot":
@@ -147,7 +151,9 @@ def main(argv=None):
         print(output)
         routine_reports = args.command in {"scheduled", "apply", "maintenance", "stage-reboot", "verify"}
         if (routine_reports and cfg.get("notifications", True)) or (args.command == "security-check" and result["alerts"]):
-            send_report(cfg, f"LKSU {args.command} {datetime.now().isoformat(timespec='minutes')}", output)
+            subject, body = build_email_report(cfg, args.command, result)
+            report_attempted = True
+            send_report(cfg, subject, body)
         if routine_reports or args.command == "security-check":
             send_fleet_report(cfg, {"command": args.command, "result": result, "hostname": os.uname().nodename, "reported_at": int(datetime.now().timestamp())})
         if reboot_requested:
@@ -155,6 +161,15 @@ def main(argv=None):
         return 0 if not (args.command == "verify" and not result["healthy"]) else 2
     except (core.LKSUError, OSError, ValueError, KeyError, smtplib.SMTPException) as exc:
         print(f"LKSU error: {exc}", file=sys.stderr)
+        # Report failed scheduled actions too, without retrying a failed SMTP send.
+        if cfg is not None and not report_attempted and cfg.get("notifications", True) and args.command in {
+            "scheduled", "apply", "maintenance", "stage-reboot", "verify", "security-check"
+        }:
+            try:
+                subject, body = build_email_report(cfg, args.command, {"status": "error", "error": str(exc)})
+                send_report(cfg, subject, body)
+            except (core.LKSUError, OSError, ValueError, KeyError, smtplib.SMTPException) as mail_error:
+                print(f"LKSU report delivery failed: {mail_error}", file=sys.stderr)
         return 1
 
 

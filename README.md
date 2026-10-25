@@ -45,6 +45,14 @@ curl -fsSL https://raw.githubusercontent.com/KeygenLTD/linux-kernel-security-upd
 
 This installs LKSU, asks for the report email and provider settings, then runs a read-only check and sends the first report. It does not enable automatic updates or reboot unless explicitly selected.
 
+## Email reports
+
+LKSU notification emails are written in English, with an operator-readable subject and plain-text summary instead of raw JSON. They include the host, report timestamp, running and installed kernels (when RPM data can be read), update/advisory counts, policy, maintenance settings, and recorded rollback kernel verification status. Counts that were not checked say **Not checked**, not zero. The next systemd check time is intentionally reported as undetermined rather than guessed.
+
+A `maintenance` invocation outside its configured window does **not** install or reboot: it performs a read-only kernel check and explains why installation was deferred. An enabled maintenance timer runs every 15 minutes, so with `notifications=true` it may send frequent status messages; disable that timer or tune notifications if you do not want that volume. The separate daily `scheduled` check also provides a report. Failed scheduled operations attempt to send an English error report; SMTP delivery errors are not retried recursively.
+
+The preserved previous kernel is **not** a full system backup. Mail never claims successful rollback without proving it.
+
 ## Manual operations
 
 ```bash
