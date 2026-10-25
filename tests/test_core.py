@@ -55,7 +55,9 @@ class KernelTests(unittest.TestCase):
                 return type("P", (), {"returncode": 0, "stdout": stdout, "stderr": ""})()
             with patch.object(core, "STATE", state), patch.object(core, "run", side_effect=fake_run), patch.object(
                 core, "default_kernel", return_value="/boot/vmlinuz-old"
-            ), patch.object(core.shutil, "which", return_value="/usr/sbin/grub2-reboot"):
+            ), patch.object(core.shutil, "which", return_value="/usr/sbin/grub2-reboot"), patch.object(
+                core, "installed", return_value=["old", "new"]
+            ), patch.object(core.Path, "is_file", return_value=True):
                 result = core.stage_trial_boot()
             self.assertEqual(result["persistent_fallback"], "/boot/vmlinuz-old")
             self.assertIn(("grub2-reboot", "machine-new.x86_64"), calls)
