@@ -129,3 +129,66 @@ def stage_one_shot(release, *, runner=subprocess.run, config=pathlib.Path("/boot
     if result.returncode:
         raise DebianKernelError("GRUB one-shot selection failed")
     return {"candidate": release, "trial_entry": entry, "rebooted": False}
+
+
+def apply_managed(distro_id, running_release, state_path, *, flavor="generic"):
+    """Install and persist a trial candidate before changing next-boot state.
+
+    Refuse to overwrite an existing pending transaction. Recovery state is
+    written atomically by LKSU core before any one-shot GRUB mutation.
+    """
+    import os
+    from .core import save
+    if state_path.exists():
+        import json
+        existing = json.loads(state_path.read_text())
+        if existing.get("pending"):
+            raise DebianKernelError("Prior kernel trial awaits verification")
+    result = install_kernel(distro_id, running_release, flavor=flavor)
+    state = {"pending": True, "backend": "debian-apt-grub",
+             "distribution": distro_id, "old_kernel": result["previous"],
+             "new_default": "/boot/vmlinuz-" + result["candidate"],
+             "trial_entry": None, "installed_package": result["package"],
+             "rebooted": False}
+    save(state_path, state)
+    return state
+
+
+def stage_managed_trial(state_path):
+    """Persist trial intent first; GRUB next_entry is not a durable rollback plan."""
+    import json
+    from .core import save
+    state = json.loads(state_path.read_text())
+    if state.get("backend") != "debian-apt-grub" or not state.get("pending"):
+        raise DebianKernelError("No pending Debian-family kernel transaction")
+    if state.get("trial_entry"):
+        raise DebianKernelError("Trial already staged")
+    release = state["new_default"].removeprefix("/boot/vmlinuz-")
+    if not RELEASE.fullmatch(release) or not RELEASE.fullmatch(state["old_kernel"]):
+        raise DebianKernelError("Invalid persisted kernel state")
+    images = boot_images()
+    if release not in images or state["old_kernel"] not in images:
+        raise DebianKernelError("Rollback or trial boot image missing")
+    entry = grub_menu_entry(release)
+    state["trial_entry"] = entry
+    save(state_path, state)
+    result = stage_one_shot(release)
+    return {**result, "old_kernel": state["old_kernel"]}
+
+
+def verify_managed(state_path, running_release, healthy):
+    """Confirm boot health; keep state pending on failure for operator recovery."""
+    import json
+    from .core import save
+    state = json.loads(state_path.read_text())
+    if state.get("backend") != "debian-apt-grub" or not state.get("pending"):
+        raise DebianKernelError("No pending Debian-family kernel transaction")
+    target = state["new_default"].removeprefix("/boot/vmlinuz-")
+    success = bool(healthy) and running_release == target
+    if success:
+        state["pending"] = False
+        state["last_known_good"] = running_release
+        save(state_path, state)
+    return {"healthy": success, "running": running_release,
+            "old_kernel": state["old_kernel"],
+            "status": "verified" if success else "operator-recovery-required"}
