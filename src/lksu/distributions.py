@@ -50,15 +50,42 @@ def detect(path=Path("/etc/os-release")):
         return Distribution(identifier, version, "rhel", "dnf/rpm", "rpm-kernel",
                             "grubby/grub2-reboot", "enabled", "guarded",
                             "Existing LKSU AlmaLinux implementation")
-    if identifier in {"rocky", "rhel", "centos", "fedora"}:
+    if identifier in {"cloudlinux", "cloudlinuxos", "cloudlinux-os", "cloudlinuxserver"}:
+        return Distribution(identifier, version, "cloudlinux", "dnf/rpm", "not-validated",
+                            "not-validated", "not-validated", "blocked",
+                            "CloudLinux kernel/LVE module and LTS/hybrid compatibility "
+                            "require independent validation; never substitute generic RPM kernels")
+    if identifier in {"rocky", "rhel", "centos", "fedora", "ol", "amzn",
+                      "eurolinux", "virtuozzo", "opencloudos", "anolis"}:
         return Distribution(identifier, version, "rhel", "dnf/rpm", "not-validated",
                             "not-validated", "not-validated", "blocked",
                             "RPM tools are similar, but kernel/GRUB lifecycle is not verified")
-    if identifier in {"ubuntu", "debian"}:
+    if identifier in {"ubuntu", "debian", "linuxmint", "pop", "elementary",
+                      "kali", "raspbian", "proxmox", "devuan"}:
         return Distribution(identifier, version, "debian", "apt/dpkg", "not-implemented",
                             "not-validated", "not-implemented", "blocked",
                             "APT kernel packaging and one-shot boot recovery require a dedicated backend")
-    if identifier in {"arch", "manjaro"}:
+    if identifier in {"opensuse-leap", "opensuse-tumbleweed", "sles", "sled"}:
+        return Distribution(identifier, version, "suse", "zypper/rpm", "not-implemented",
+                            "not-validated", "not-implemented", "blocked",
+                            "SUSE kernel packages, transactional updates and recovery not validated")
+    if identifier in {"alpine", "postmarketos"}:
+        return Distribution(identifier, version, "alpine", "apk", "not-implemented",
+                            "not-validated", "not-implemented", "blocked",
+                            "APK kernel boot flow and rollback not implemented")
+    if identifier in {"gentoo", "funtoo"}:
+        return Distribution(identifier, version, "gentoo", "emerge", "not-implemented",
+                            "not-validated", "not-implemented", "blocked",
+                            "Source-built kernel provisioning cannot be safely assumed")
+    if identifier in {"void"}:
+        return Distribution(identifier, version, "void", "xbps", "not-implemented",
+                            "not-validated", "not-implemented", "blocked",
+                            "XBPS kernel and boot rollback not implemented")
+    if identifier in {"nixos"}:
+        return Distribution(identifier, version, "nix", "nix", "not-implemented",
+                            "not-validated", "not-implemented", "blocked",
+                            "NixOS generations require a native backend")
+    if identifier in {"arch", "manjaro", "endeavouros"}:
         return Distribution(identifier, version, "arch", "pacman", "not-implemented",
                             "not-validated", "not-implemented", "blocked",
                             "Pacman kernel updates and boot recovery require separate implementation")

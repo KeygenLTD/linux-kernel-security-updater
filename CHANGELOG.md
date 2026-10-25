@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.20 — Extended Linux distribution identification (v1 groundwork)
+
+- Add read-only CloudLinux, SUSE, Alpine, Gentoo, NixOS, Void and additional RHEL/Debian/Arch derivative identification.
+- Keep all unvalidated distribution kernel installation and reboot operations blocked; AlmaLinux 8/9/10 remain the only tested automation implementation.
+- Add CloudLinux-specific LVE/LTS/hybrid limitations and platform compatibility requirements. This does not claim v1.0.0-level cross-distribution support.
+
+
 ## v0.3.19 — Multi-distribution detection foundation
 
 - Detect RHEL-family, Debian-family and Arch-family systems via the read-only `lksu compatibility --json` command.
