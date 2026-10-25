@@ -140,7 +140,6 @@ def apply_managed(distro_id, running_release, state_path, *, flavor="generic"):
     Refuse to overwrite an existing pending transaction. Recovery state is
     written atomically by LKSU core before any one-shot GRUB mutation.
     """
-    import os
     from .core import save
     if state_path.exists():
         import json
@@ -173,9 +172,9 @@ def stage_managed_trial(state_path):
     if release not in images or state["old_kernel"] not in images:
         raise DebianKernelError("Rollback or trial boot image missing")
     entry = grub_menu_entry(release)
+    result = stage_one_shot(release)
     state["trial_entry"] = entry
     save(state_path, state)
-    result = stage_one_shot(release)
     return {**result, "old_kernel": state["old_kernel"]}
 
 
