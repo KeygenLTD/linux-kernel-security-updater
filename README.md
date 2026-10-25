@@ -31,13 +31,16 @@
 
 ![LKSU kernel update, verification and fallback illustration](docs/assets/lksu-hero.png)
 
-> **Status: v0.3.21 early preview.** CI unit tests target Python 3.9, 3.11 and 3.13. One AlmaLinux 9.8 VPS successfully completed a kernel RPM update, automatic trial reboot and post-boot service verification with an earlier LKSU release. That does **not** validate v0.3.21 on a production host, all AlmaLinux 8/9/10 BIOS/UEFI/recovery variants, or automatic kernel cleanup. Confirm an external snapshot, provider console and service checks before unattended reboot.
+> **Status: v0.3.22 early preview.** CI unit tests target Python 3.9, 3.11 and 3.13. One AlmaLinux 9.8 VPS successfully completed a kernel RPM update, automatic trial reboot and post-boot service verification with an earlier LKSU release. That does **not** validate v0.3.21 on a production host, all AlmaLinux 8/9/10 BIOS/UEFI/recovery variants, or automatic kernel cleanup. Confirm an external snapshot, provider console and service checks before unattended reboot.
 
 Early production-oriented release for **AlmaLinux 8, 9 and 10**. LKSU uses the distribution's enabled DNF repositories. It does not enable testing repositories, select a CVE-specific build, or download arbitrary RPMs. It requests automatic reboot only after opt-in and safety checks.
 
 See [platform coverage and safety gates](docs/platform-support.md) for CloudLinux, Ubuntu, Debian, SUSE, Arch, NixOS and other families. Detection does not authorize kernel changes.
 
 ## Multi-distribution roadmap (in development)
+
+`lksu kernel-inventory --json` runs a read-only package inventory on Ubuntu/Debian and RPM families (including CloudLinux). It does not install or reboot kernels; only the Ubuntu CI runner has a native smoke test so far.
+
 
 Run `lksu compatibility --json` to inspect the current Linux distribution and the
 available kernel/update/boot backend **without making system changes**.
@@ -110,7 +113,7 @@ systemctl list-timers lksu.timer lksu-maintenance.timer
 For the pinned **v0.3.20 release** on AlmaLinux 8/9/10 (only after the GitHub Release wheel has been published and verified):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/KeygenLTD/linux-kernel-security-updater/v0.3.21/bootstrap.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/KeygenLTD/linux-kernel-security-updater/v0.3.22/bootstrap.sh | sudo bash
 ```
 
 This installs LKSU, asks for the report email and provider settings, configures timers, and immediately attempts an eligible kernel installation if automatic updates are selected. A trial reboot can occur when explicitly enabled and after every recovery and health gate passes.

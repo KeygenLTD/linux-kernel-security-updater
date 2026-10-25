@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.22 — Cross-distribution read-only kernel inventory
+
+- Implement `lksu kernel-inventory --json` for installed APT linux-image and RPM kernel packages including CloudLinux variants.
+- Run read-only inventory on an Ubuntu CI host and add unit tests across Python 3.9/3.11/3.13.
+- Kernel installation, one-shot reboot and rollback remain AlmaLinux-only and all unverified backends remain fail-closed.
+
+
 ## v0.3.21 — Actual Linux container image detection tests
 
 - CI validates distribution detection and fail-closed update/reboot gates against Ubuntu 24.04, Debian 12, Rocky 9, Fedora, Alpine and Arch Linux official container images.
