@@ -1,4 +1,4 @@
-name: isolated QEMU VM smoke
+name: isolated multi-distribution QEMU VM smoke
 
 on:
   pull_request:
@@ -17,30 +17,43 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ubuntu-vm:
+  linux-vm:
+    name: isolated VM (${{ matrix.distro }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: ubuntu
+            image_url: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
+            checksums_url: https://cloud-images.ubuntu.com/noble/current/SHA256SUMS
+            checksum_algorithm: sha256
+          - distro: debian
+            image_url: https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2
+            checksums_url: https://cloud.debian.org/images/cloud/bookworm/latest/SHA512SUMS
+            checksum_algorithm: sha512
     steps:
       - uses: actions/checkout@v4
-      - name: Install QEMU and image tools
+      - name: Install QEMU and cloud-init tools
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils cloud-image-utils openssh-client
-      - name: Download Ubuntu cloud image and validate checksum
-        run: |
-          set -euo pipefail
-          base=https://cloud-images.ubuntu.com/noble/current
-          curl --fail --location --retry 3 --output noble-server-cloudimg-amd64.img "$base/noble-server-cloudimg-amd64.img"
-          curl --fail --location --retry 3 --output SHA256SUMS "$base/SHA256SUMS"
-          grep 'noble-server-cloudimg-amd64.img$' SHA256SUMS | sha256sum --check
-          qemu-img info noble-server-cloudimg-amd64.img
-      - name: Boot isolated guest and verify its kernel via SSH
+      - name: Download and checksum official cloud image
+        env:
+          IMAGE_URL: ${{ matrix.image_url }}
+          CHECKSUMS_URL: ${{ matrix.checksums_url }}
+          CHECKSUM_ALGORITHM: ${{ matrix.checksum_algorithm }}
+        run: bash tests/vm/fetch-guest-image.sh
+      - name: Boot guest, verify distinct Linux kernel and SSH
+        env:
+          EXPECTED_DISTRO: ${{ matrix.distro }}
         run: bash tests/vm/ubuntu-boot-smoke.sh
       - name: Upload diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: qemu-vm-diagnostics
+          name: qemu-${{ matrix.distro }}-diagnostics
           path: |
             vm-serial.log
             vm-qemu.log
