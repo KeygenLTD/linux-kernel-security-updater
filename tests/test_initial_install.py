@@ -91,9 +91,49 @@ class InitialInstallTests(unittest.TestCase):
     def test_cli_initial_setup_reboots_only_after_successful_staging(
         self, cfg, fleet, send, run, initial, lock
     ):
-        with contextlib.redirect_stdout(io.StringIO()):
+        err = io.StringIO()
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
             self.assertEqual(cli.main(["initialize"]), 0)
         initial.assert_called_once()
+        run.assert_called_once_with("systemctl", "reboot")
+        self.assertIn("Requesting system reboot NOW", err.getvalue())
+        self.assertIn("SSH may disconnect", err.getvalue())
+        self.assertIn("Boot success is verified only after", err.getvalue())
+
+    @patch("lksu.cli.core.kernel_operation_lock")
+    @patch("lksu.cli.core.initial_run", return_value=(
+        {"status": "trial-boot-staged", "trial_boot": {"trial_entry": "x"},
+         "new_default": "/boot/vmlinuz-5.14.0-687.59.1.el9_8.x86_64"}, True
+    ))
+    @patch("lksu.cli.core.run")
+    @patch("lksu.cli.send_fleet_report")
+    @patch("lksu.cli.core.config", return_value={
+        "automatic_updates": True, "automatic_reboot": True, "notifications": False
+    })
+    def test_reboot_status_keeps_machine_readable_stdout_clean(self, cfg, fleet, run, initial, lock):
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            self.assertEqual(cli.main(["--json", "initialize"]), 0)
+        self.assertEqual(json.loads(stdout.getvalue())["status"], "trial-boot-staged")
+        self.assertIn("Requesting system reboot NOW", stderr.getvalue())
+        self.assertNotIn("LKSU [REBOOT]", stdout.getvalue())
+        run.assert_called_once_with("systemctl", "reboot")
+
+    @patch("lksu.cli.core.kernel_operation_lock")
+    @patch("lksu.cli.core.initial_run", return_value=(
+        {"status": "trial-boot-staged", "trial_boot": {"trial_entry": "x"}}, True
+    ))
+    @patch("lksu.cli.core.run", side_effect=core.LKSUError("systemctl reboot refused"))
+    @patch("lksu.cli.send_fleet_report")
+    @patch("lksu.cli.core.config", return_value={
+        "automatic_updates": True, "automatic_reboot": True, "notifications": False
+    })
+    def test_failed_reboot_request_is_visible(self, cfg, fleet, run, initial, lock):
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            self.assertEqual(cli.main(["initialize"]), 1)
+        self.assertIn("Requesting system reboot NOW", stderr.getvalue())
+        self.assertIn("Reboot request failed", stderr.getvalue())
         run.assert_called_once_with("systemctl", "reboot")
 
 

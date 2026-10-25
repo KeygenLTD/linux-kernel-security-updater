@@ -9,6 +9,8 @@ import subprocess
 import time
 from pathlib import Path
 
+from .progress import event
+
 PACKAGES = ("kernel", "kernel-core", "kernel-modules", "kernel-modules-core", "kernel-modules-extra")
 STATE = Path("/var/lib/lksu/state.json")
 INITIAL_STATE = Path("/var/lib/lksu/initial-run.json")
@@ -125,6 +127,7 @@ def apply(policy):
     if policy not in {"all-stable", "security-only"}:
         raise LKSUError("Installation requires policy=all-stable or security-only")
     # Determine eligibility without treating low /boot as an unrecoverable error.
+    event("CHECK", "Checking installed kernel versions, repositories and /boot space...")
     before = check()
     if policy == "security-only" and not before["security_advisories"]:
         return {"status": "no-security-updates", **before}
@@ -135,10 +138,12 @@ def apply(policy):
     old = before["running"]
     removed_old_kernels = []
     if before.get("boot_free_mib", 500) < 500:
+        event("CLEANUP", "/boot below the minimum free-space threshold; checking safe obsolete-kernel cleanup.")
         from .kernel_cleanup import reclaim_for_update
         removed_old_kernels = reclaim_for_update()
     # Validate free space, GRUB and the running kernel again before DNF.
     preflight()
+    event("UPDATE", "Eligible kernel upgrade found; installing repository RPM packages with DNF. Please do not close this session.")
     # Preserve the exact running kernel and its installed modules against DNF's installonly cleanup.
     # DNF installonly_limit is overridden for this transaction; never erase old RPMs here.
     command = ["dnf", "-y", "--setopt=installonly_limit=0", "upgrade"]
@@ -153,6 +158,8 @@ def apply(policy):
         raise LKSUError("New kernel was not selected as default; inspect DNF result")
     state = {"pending": True, "old_kernel": old, "new_default": chosen, "installed": after, "updated_at": int(time.time())}
     save(STATE, state)
+    event("UPDATE", "Kernel RPM installation finished. Running: " + old + "; next-boot candidate: " +
+          chosen.removeprefix("/boot/vmlinuz-") + ".")
     return {"status": "installed-awaiting-manual-reboot", **state,
             "cleaned_old_kernels": removed_old_kernels}
 
@@ -162,6 +169,7 @@ def verify(cfg):
     if state is None:
         return {"status": "no-pending-verification", "healthy": True, "verification_performed": False}
     running = os.uname().release
+    event("VERIFY", "Server restarted. Running kernel: " + running + ". Checking configured applications...")
     from .health import check_all
     results = check_all(cfg)
     healthy = bool(results) and running == state["new_default"].removeprefix("/boot/vmlinuz-") and all(results.values())
@@ -173,7 +181,9 @@ def verify(cfg):
         state["pending"] = False
         state["last_known_good"] = running
         save(STATE, state)
+        event("VERIFY", "Post-boot checks passed; new kernel confirmed and made persistent default.")
     else:
+        event("VERIFY", "Post-boot verification failed. Old kernel remains the persistent fallback; operator review required.")
         report["recommended_action"] = "Investigate failed checks. If rollback is required, confirm provider console access, run 'lksu select-old', verify grubby --default-kernel, then reboot in an approved window."
     return report
 
@@ -207,6 +217,8 @@ def stage_trial_boot():
     if not shutil.which("grub2-reboot"):
         raise LKSUError("grub2-reboot is required for one-shot trial boot")
     run("grub2-reboot", entry)
+    event("REBOOT", "One-time GRUB boot staged for " + new_image.removeprefix("/boot/vmlinuz-") +
+          "; persistent fallback: " + old_image.removeprefix("/boot/vmlinuz-") + ".")
     state["trial_entry"] = entry
     state["persistent_fallback"] = old_image
     save(STATE, state)
@@ -339,6 +351,7 @@ def adopt_preinstalled_kernel(info):
 
 def auto_reboot_preflight(cfg):
     """Fail closed until human-approved recovery and meaningful health checks exist."""
+    event("REBOOT", "Checking operator-approved recovery readiness and application health...")
     if not cfg.get("recovery_ready", False):
         raise LKSUError("Automatic reboot blocked: set recovery_ready=true only after confirming an external snapshot and provider-console recovery")
     if not cfg.get("services") and not cfg.get("health_urls"):
@@ -350,6 +363,8 @@ def auto_reboot_preflight(cfg):
     verify_unit = run("systemctl", "is-enabled", "lksu-verify.service", check=False)
     if verify_unit.returncode or verify_unit.stdout.strip() not in {"enabled", "enabled-runtime"}:
         raise LKSUError("Automatic reboot blocked: lksu-verify.service must be enabled")
+    event("REBOOT", "Pre-reboot application checks passed (" + str(len(checks)) +
+          "). Recovery prerequisites were confirmed by the operator.")
     return checks
 
 
@@ -368,6 +383,8 @@ def maintenance(cfg):
     else:
         result = check()
     if not cfg.get("automatic_reboot"):
+        if result.get("status") in {"installed-awaiting-manual-reboot", "reboot-required"}:
+            event("REBOOT", "Automatic reboot disabled; kernel transition is pending manual action.")
         return result, False
     if result.get("status") in {"trial-boot-staged", "verification-pending"}:
         return result, False
@@ -382,9 +399,12 @@ def maintenance(cfg):
         # visible rather than silently pretending the kernel is active.
         result["status"] = "reboot-blocked"
         result["reboot_block_reason"] = str(exc)
+        event("REBOOT", "Restart blocked: " + str(exc))
         return result, False
     if adopt:
+        event("REBOOT", "A newer kernel is already installed; verifying it for a controlled trial boot.")
         result = {**result, **adopt_preinstalled_kernel(result)}
+    event("REBOOT", "Preparing one-time GRUB boot with previous-kernel fallback...")
     result["trial_boot"] = stage_trial_boot()
     result["status"] = "trial-boot-staged"
     return result, True
@@ -398,15 +418,18 @@ def initial_run(cfg):
     mandatory. Persist the completion marker before any requested reboot.
     """
     if INITIAL_STATE.exists():
+        event("INIT", "Initial setup action was already recorded; not repeating the first-install kernel transaction.")
         marker = json.loads(INITIAL_STATE.read_text())
         if marker.get("completed") is True:
             return {"status": "initial-run-completed", "completed_at": marker.get("completed_at")}, False
         raise LKSUError("Invalid initial-run state; inspect before retry")
     if not cfg.get("automatic_updates") and not cfg.get("automatic_reboot"):
+        event("INIT", "Automatic updates and reboot disabled; performing read-only check.")
         result = check()
         result["status"] = "initial-check-only"
         reboot = False
     else:
+        event("INIT", "Starting first managed kernel maintenance pass...")
         result, reboot = maintenance(cfg)
     save(INITIAL_STATE, {
         "completed": True,
