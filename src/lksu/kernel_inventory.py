@@ -14,7 +14,7 @@ SAFE_PACKAGE = re.compile(r"^[a-zA-Z0-9.+_~-]+$")
 
 
 def _installed_apt_images():
-    proc = core.run("dpkg-query", "-W", "-f=${binary:Package} ${Status} ${Version}\\n",
+    proc = core.run("dpkg-query", "-W", "-f=${binary:Package} ${Status} ${Version}\n",
                     "linux-image-*", check=False, timeout=40)
     if proc.returncode not in (0, 1):
         raise core.LKSUError("Could not query installed APT kernel packages: " + proc.stderr[:250])
@@ -47,7 +47,7 @@ def apt_inventory(distro):
 def rpm_inventory(distro):
     if distro.package_manager != "dnf/rpm":
         raise core.LKSUError("RPM inventory requires RPM-family distribution")
-    proc = core.run("rpm", "-qa", "--qf", "%{NAME} %{VERSION}-%{RELEASE}.%{ARCH}\\n",
+    proc = core.run("rpm", "-qa", "--qf", "%{NAME} %{VERSION}-%{RELEASE}.%{ARCH}\n",
                     check=False, timeout=40)
     if proc.returncode != 0:
         raise core.LKSUError("Could not query installed RPM packages: " + proc.stderr[:250])
