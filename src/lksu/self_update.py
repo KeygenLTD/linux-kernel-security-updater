@@ -197,16 +197,21 @@ def update(*, automatic=False, enabled=False):
         with tempfile.TemporaryDirectory(prefix=".lksu-update-", dir=str(ROOT)) as temporary:
             wheel = Path(temporary) / f"lksu-{info['tag'][1:]}-py3-none-any.whl"
             _download(info, wheel)
-            candidate = Path(temporary) / "venv"
-            venv.EnvBuilder(with_pip=True, clear=False).create(str(candidate))
-            _cmd(str(candidate / "bin" / "python"), "-m", "pip", "install",
-                 "--no-index", "--no-deps", "--disable-pip-version-check", str(wheel))
-            observed = _cmd(str(candidate / "bin" / "python"), "-c",
-                            "import importlib.metadata; print(importlib.metadata.version('lksu'))").strip()
-            if observed != info["tag"][1:]:
-                raise LKSUError("Installed LKSU version does not match the release")
-            _cmd(str(candidate / "bin" / "lksu"), "--help")
-            os.replace(candidate, target)
+            # Create directly at its final absolute path: venv entrypoint shebangs
+            # cannot safely be moved after pip generates them.
+            candidate = target
+            try:
+                venv.EnvBuilder(with_pip=True, clear=False).create(str(candidate))
+                _cmd(str(candidate / "bin" / "python"), "-m", "pip", "install",
+                     "--no-index", "--no-deps", "--disable-pip-version-check", str(wheel))
+                observed = _cmd(str(candidate / "bin" / "python"), "-c",
+                                "import importlib.metadata; print(importlib.metadata.version('lksu'))").strip()
+                if observed != info["tag"][1:]:
+                    raise LKSUError("Installed LKSU version does not match the release")
+                _cmd(str(candidate / "bin" / "lksu"), "--help")
+            except (LKSUError, OSError, subprocess.SubprocessError):
+                shutil.rmtree(candidate, ignore_errors=True)
+                raise
         _activate_release(target)
         return {"status": "self-updated", "previous_version": current,
                 "installed_version": info["tag"], "previous_release_retained": True,
