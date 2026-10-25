@@ -10,7 +10,6 @@ from lksu.reporting import format_console_report
 CFG = {
     "policy": "all-stable", "automatic_updates": True, "automatic_reboot": False,
     "automatic_lksu_updates": False,
-    "maintenance_window": {"enabled": True, "start": "03:00", "duration_minutes": 60},
 }
 CHECKED = {
     "running": "6.12.0-211.51.1.el10_2.x86_64",
@@ -67,7 +66,7 @@ class ConsoleTests(unittest.TestCase):
         saved = save.call_args.args[1]
         self.assertTrue(saved["automatic_lksu_updates"])
         self.assertEqual(saved["policy"], "all-stable")
-        self.assertEqual(saved["maintenance_window"]["start"], "03:00")
+        self.assertNotIn("maintenance_window", saved)
 
     @patch("lksu.cli.core.save")
     @patch("lksu.cli.core.config", return_value=CFG)
@@ -97,7 +96,8 @@ class ConsoleTests(unittest.TestCase):
         self.assertTrue(data["automatic_updates"])
         self.assertEqual(data["policy"], "all-stable")
         self.assertTrue(data["automatic_lksu_updates"])
-        self.assertFalse(data["maintenance_window"]["enabled"])
+        self.assertNotIn("maintenance_window", data)
+        self.assertFalse(any("maintenance" in str(call).lower() or "window" in str(call).lower() for call in prompt.call_args_list))
         self.assertTrue(data["automatic_reboot"])
         self.assertFalse(data["recovery_ready"])
         self.assertEqual(data["smtp_password"], "dedicated-token")
@@ -273,17 +273,19 @@ class ConsoleTests(unittest.TestCase):
     @patch("lksu.cli.core.config")
     @patch("lksu.cli.os.geteuid", return_value=0)
     @patch("builtins.input")
-    def test_disabling_window_keeps_kernel_timer_and_reboot_enabled(
+    def test_legacy_settings_never_restrict_automation(
         self, prompt, _root, config, save, run
     ):
         data = dict(CFG)
-        data.update({"automatic_reboot": True, "recovery_ready": True, "services": ["mariadb"], "health_urls": []})
+        data.update({"automatic_reboot": True, "recovery_ready": True, "services": ["mariadb"], "health_urls": [],
+                     "maintenance_window": {"enabled": True, "start": "03:00", "duration_minutes": 60}})
         config.return_value = data
-        prompt.side_effect = lambda message: "n" if message.startswith("Restrict automatic kernel updates") else ""
+        prompt.return_value = ""
         with contextlib.redirect_stdout(io.StringIO()):
             cli.configure_automation()
         saved = save.call_args.args[1]
-        self.assertFalse(saved["maintenance_window"]["enabled"])
+        self.assertNotIn("maintenance_window", saved)
+        self.assertFalse(any("maintenance" in str(call).lower() or "window" in str(call).lower() for call in prompt.call_args_list))
         self.assertTrue(saved["automatic_reboot"])
         self.assertTrue(saved["recovery_ready"])
         self.assertIn(

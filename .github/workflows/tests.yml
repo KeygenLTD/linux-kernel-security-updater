@@ -22,4 +22,27 @@ jobs:
       - run: python -m unittest discover -s tests -v
       - run: python -m compileall -q src
       - run: bash -n bootstrap.sh install.sh lksu-status.sh
+      - name: Build and validate release wheel
+        run: |
+          python -m pip install --upgrade build
+          python -m build --wheel --outdir dist
+          python - <<'PY'
+          import pathlib, re, zipfile
+          p = pathlib.Path("pyproject.toml").read_text()
+          version = re.search(r'^version\s*=\s*"([^"]+)"', p, re.M).group(1)
+          wheels = list(pathlib.Path("dist").glob("*.whl"))
+          assert len(wheels) == 1, "Expected exactly one wheel"
+          assert wheels[0].name == f"lksu-{version}-py3-none-any.whl", wheels[0].name
+          with zipfile.ZipFile(wheels[0]) as archive:
+              assert archive.testzip() is None, "Invalid wheel CRC"
+              assert "lksu/cli.py" in archive.namelist()
+              metadata = [n for n in archive.namelist() if n.endswith(".dist-info/METADATA")]
+              assert len(metadata) == 1
+              text = archive.read(metadata[0]).decode()
+              assert re.search(r"^Version: " + re.escape(version) + r"$", text, re.M)
+          print("Validated:", wheels[0])
+          PY
+          python -m venv "$RUNNER_TEMP/lksu-wheel-test"
+          "$RUNNER_TEMP/lksu-wheel-test/bin/python" -m pip install --no-deps dist/*.whl
+          "$RUNNER_TEMP/lksu-wheel-test/bin/lksu" --help >/dev/null
 

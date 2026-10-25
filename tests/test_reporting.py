@@ -13,7 +13,6 @@ CONFIG = {
     "notifications": True,
     "automatic_updates": True,
     "automatic_reboot": False,
-    "maintenance_window": {"enabled": True, "start": "03:00", "duration_minutes": 60},
 }
 
 
@@ -27,26 +26,24 @@ def render(command, result):
 
 
 class ReportTests(unittest.TestCase):
-    def test_outside_window_reports_real_available_updates(self):
+    def test_24_7_report_has_no_maintenance_window(self):
         subject, body = render("maintenance", {
-            "status": "outside-maintenance-window",
+            "status": "no-updates",
             "running": "6.12.0-current",
-            "updates": [{"name": "kernel-core", "evr": "6.12.0-new", "arch": "x86_64"}],
-            "security_advisories": [{"id": "ALSA-2026:1234", "severity": "Important", "cves": ["CVE-2026-12345"]}],
+            "updates": [],
+            "security_advisories": [],
         })
-        self.assertEqual(subject, "LKSU [DEFERRED] test-node | maintenance")
-        self.assertIn("Kernel package upgrades: 1", body)
-        self.assertIn("Security advisories: 1", body)
-        self.assertIn("installation skipped outside the maintenance window", body)
+        self.assertIn("[NO UPDATES]", subject)
+        self.assertIn("Kernel check interval: Every 15 minutes", body)
+        self.assertIn("Unattended reboot: Requires opt-in", body)
+        self.assertNotIn("Maintenance window:", body)
+        self.assertNotIn("03:00", body)
         self.assertIn("Rollback kernel:", body)
         self.assertIn("Next scheduled check: Not determined", body)
-        self.assertNotIn('{"status":', body)
 
-    def test_unknown_update_information_is_not_zero(self):
-        subject, body = render("maintenance", {"status": "outside-maintenance-window", "running": "6.12.0-current"})
-        self.assertIn("[SKIPPED]", subject)
+    def test_unassessed_upgrade_information_is_not_zero(self):
+        _, body = render("maintenance", {"status": "reboot-blocked", "running": "6.12.0-current"})
         self.assertIn("Kernel package upgrades: Not checked", body)
-        self.assertNotIn("No kernel package upgrades found", body)
 
     def test_error_report_requires_action(self):
         subject, body = render("scheduled", {"status": "error", "error": "DNF metadata request failed", "running": "6.12.0-current"})
@@ -67,34 +64,16 @@ class ReportTests(unittest.TestCase):
         self.assertIn("Confirm provider-console recovery", body)
 
 
-class MaintenancePolicyTests(unittest.TestCase):
-    def test_explicit_no_window_permits_automatic_installation(self):
-        from lksu.policy import in_maintenance_window
-        anytime = {"maintenance_window": {"enabled": False, "start": "02:00", "duration_minutes": 60}}
-        now = datetime(2026, 10, 25, 22, 30, tzinfo=timezone.utc)
-        self.assertTrue(in_maintenance_window(anytime, now=now))
-
-    def test_missing_window_does_not_authorize_automatic_installation(self):
-        from lksu.policy import in_maintenance_window
-        self.assertFalse(in_maintenance_window({}, now=datetime(2026, 10, 25, tzinfo=timezone.utc)))
-
-
 class CLIReportTests(unittest.TestCase):
     @patch("lksu.cli.send_fleet_report")
-    @patch("lksu.cli.send_report")
-    @patch("lksu.cli.build_email_report", return_value=("English subject", "English body"))
-    @patch("lksu.cli.core.apply")
-    @patch("lksu.cli.core.check", return_value={"running": "old", "updates": [{"name": "kernel-core"}]})
-    @patch("lksu.cli.in_maintenance_window", return_value=False)
+    @patch("lksu.cli.core.maintenance", return_value=({"status": "no-updates", "updates": []}, False))
+    @patch("lksu.cli.core.kernel_operation_lock")
     @patch("lksu.cli.core.config", return_value=CONFIG)
-    def test_maintenance_outside_window_checks_without_updating(
-        self, _config, _window, check, apply, report, send, fleet
+    def test_maintenance_always_calls_guarded_update_path(
+        self, _config, _lock, maintenance, fleet
     ):
         self.assertEqual(cli.main(["maintenance"]), 0)
-        check.assert_called_once_with()
-        apply.assert_not_called()
-        report.assert_not_called()
-        send.assert_not_called()
+        maintenance.assert_called_once_with(CONFIG)
         fleet.assert_called_once()
 
     @patch("lksu.cli.send_fleet_report")
