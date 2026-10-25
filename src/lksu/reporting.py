@@ -64,6 +64,24 @@ def _outcome(command, result):
     updates = result.get("updates")
     if status == "error":
         return "ERROR", "Command failed; results must not be treated as a successful check.", "Yes - investigate the error shown below."
+    if status == "self-updated":
+        return "LKSU UPDATED", "LKSU application upgraded to a verified release without reboot.", "Monitor the next scheduled health and kernel checks."
+    if status == "self-update-available":
+        return "LKSU UPDATE AVAILABLE", "A newer LKSU application release is published; no installation was performed.", "Review the published release."
+    if status == "self-update-current":
+        return "LKSU CURRENT", "Installed LKSU application release is current.", "No action indicated."
+    if status == "self-update-no-release":
+        return "NO LKSU RELEASE", "No stable GitHub release is published; LKSU was not modified.", "No action indicated."
+    if status == "self-update-disabled":
+        return "SELF-UPDATE DISABLED", "Automatic LKSU application updates are disabled by configuration.", "No action indicated."
+    if status == "no-pending-verification":
+        return "NOT REQUIRED", "There is no pending LKSU kernel transition to verify.", "No action indicated."
+    if status == "verification-pending":
+        return "VERIFICATION PENDING", "A kernel transition is pending post-boot verification; no further kernel installation was attempted.", "Yes - check the booted kernel and run lksu verify."
+    if status == "trial-boot-staged":
+        return "TRIAL BOOT STAGED", "One-shot trial boot was staged; the previous kernel remains the persistent fallback.", "Monitor host access and complete post-boot health verification."
+    if result.get("reboot_required"):
+        return "REBOOT REQUIRED", "The default boot kernel is installed but differs from the running kernel; no further package upgrade is necessarily needed.", "Review the boot target and execute a guarded trial reboot in an approved maintenance window."
     if status == "outside-maintenance-window":
         if isinstance(updates, list) and updates:
             return "DEFERRED", "Read-only kernel check completed; installation skipped outside the maintenance window.", "Review available updates; installation is deferred until an authorized window."
@@ -134,15 +152,21 @@ def build_email_report(cfg, command, result, *, timestamp=None, hostname=None, o
         "Running kernel: " + str(result.get("running") or os.uname().release),
         "Installed kernels: " + (", ".join(installed_kernels) if installed_kernels else ("None found" if installed_kernels == [] else "Not available")),
         "Default kernel: " + str(result.get("default", "Not checked")),
+        "Boot status: " + str(result.get("boot_status", "Not checked")),
+        "Reboot required: " + ("Yes" if result.get("reboot_required") is True else ("No" if result.get("reboot_required") is False else "Not determined")),
+        "Reboot target: " + str(result.get("reboot_target") or result.get("new_default") or "Not established"),
         "Rollback kernel: " + _rollback_status(installed_kernels, result),
         "",
         "Update assessment",
         "-----------------",
         "Kernel package upgrades: " + package_count,
         "Security advisories: " + advisory_count,
+        "Advisory applicability: Not confirmed by this count alone",
         "Install policy: " + str(cfg.get("policy", "Not configured")),
         "Automatic installation: " + ("Enabled" if cfg.get("automatic_updates", False) else "Disabled"),
         "Automatic reboot: " + ("Enabled" if cfg.get("automatic_reboot", False) else "Disabled"),
+        "Recovery readiness approval: " + ("Confirmed by operator" if cfg.get("recovery_ready") else "Not confirmed"),
+        "Automatic LKSU application updates: " + ("Enabled" if cfg.get("automatic_lksu_updates") else "Disabled"),
         "",
         "Scheduling",
         "----------",
@@ -169,6 +193,10 @@ def build_email_report(cfg, command, result, *, timestamp=None, hostname=None, o
         for item in advisories:
             if isinstance(item, dict) and item.get("warning"):
                 lines.append("Advisory warning: " + str(item["warning"])[:300])
+    if result.get("status", "").startswith("self-update"):
+        lines.extend(["", "LKSU application", "----------------",
+            "Installed application version: " + str(result.get("installed_version", "Not checked")),
+            "Available release: " + str(result.get("release_version", "Not checked"))])
     if result.get("error"):
         lines.extend(["", "Failure details", "---------------", str(result["error"])[:1000]])
     if "services" in result and isinstance(result["services"], dict):

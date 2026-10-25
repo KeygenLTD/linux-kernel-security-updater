@@ -1,0 +1,67 @@
+name: publish LKSU wheel
+on:
+  push:
+    branches: [main]
+    tags:
+      - "v[0-9]*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Test
+        run: |
+          python -m pip install --upgrade build
+          python -m pip install -e .
+          python -m unittest discover -s tests -v
+      - name: Verify tag matches package version
+        id: version
+        run: |
+          python - <<'PY'
+          import os, pathlib, re
+          tag=os.environ["GITHUB_REF_NAME"]
+          text=pathlib.Path("pyproject.toml").read_text()
+          match=re.search(r'^version\s*=\s*"([^"]+)"', text, re.M)
+          if not match:
+              raise SystemExit("Missing package version")
+          tag="v"+match.group(1)
+          if os.environ["GITHUB_REF"].startswith("refs/tags/") and os.environ["GITHUB_REF_NAME"]!=tag:
+              raise SystemExit("Tag/version mismatch; refusing release")
+          with open(os.environ["GITHUB_OUTPUT"],"a") as output:
+              output.write("tag="+tag+"\n")
+          PY
+      - name: Build a versioned wheel
+        run: python -m build --wheel --outdir dist
+      - name: Publish wheel as GitHub Release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(find dist -maxdepth 1 -name '*.whl' | wc -l)" -eq 1
+          tag="${{ steps.version.outputs.tag }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; keeping published artifacts immutable."
+            exit 0
+          fi
+          if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+              echo "Refusing to create a missing tag outside main" >&2
+              exit 1
+            fi
+            git tag "$tag"
+            git push origin "refs/tags/$tag"
+          fi
+          tag_commit="$(git rev-list -n 1 "$tag")"
+          if [ "$tag_commit" != "$GITHUB_SHA" ]; then
+            echo "Existing tag points to a different commit; refusing release" >&2
+            exit 1
+          fi
+          gh release create "$tag" dist/*.whl --title "$tag" --generate-notes --verify-tag

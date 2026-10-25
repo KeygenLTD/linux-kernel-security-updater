@@ -1,0 +1,11 @@
+[Unit]
+Description=Check and install verified LKSU application releases
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/lksu self-update-scheduled
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-RELEASE="v0.3.11"
+RELEASE="v0.3.12"
 REPO="KeygenLTD/linux-kernel-security-updater"
 ARCHIVE="https://github.com/${REPO}/archive/refs/tags/${RELEASE}.tar.gz"
 [[ "${EUID}" -eq 0 ]] || { echo "Run with sudo" >&2; exit 1; }
@@ -11,19 +11,19 @@ root="$(find "$tmp" -maxdepth 1 -mindepth 1 -type d -name 'linux-kernel-security
 [[ -n "$root" ]] || { echo "Invalid release archive" >&2; exit 1; }
 "$root/install.sh"
 if [[ -s /etc/lksu/config.json ]]; then
-  echo "Mevcut LKSU yapılandırması korunuyor. Yeniden yapılandırmak için: lksu configure"
+  echo "Existing LKSU configuration preserved. Run lksu configure to change settings."
 elif [[ -r /dev/tty ]]; then
-  echo "LKSU yapılandırması başlıyor."
+  echo "Starting LKSU configuration."
   /usr/local/bin/lksu configure </dev/tty >/dev/tty
 else
   echo "Interactive terminal is required for LKSU configuration." >&2
   exit 1
 fi
 if ! /usr/local/bin/lksu scheduled; then
-  echo "LKSU ilk kontrolü tamamlandı ancak e-posta bildirimi başarısız oldu; otomasyon yine de etkinleştirilecek." >&2
+  echo "Initial LKSU check or email failed; review the error. Scheduling remains available." >&2
 fi
 
-echo "LKSU ilk kontrol tamamlandı; seçilen otomasyonlar etkinleştiriliyor."
+echo "Initial LKSU check finished. Enabling selected timers."
 systemctl enable --now lksu.timer
 systemctl enable --now lksu-security-watch.timer
 if python3 - <<'PY'
