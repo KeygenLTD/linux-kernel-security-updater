@@ -144,6 +144,7 @@ class ConsoleTests(unittest.TestCase):
         data = dict(CFG)
         data["services"] = []
         data["health_urls"] = []
+        data["automatic_reboot"] = True
         config.return_value = data
         run.return_value.returncode = 3
         with self.assertRaisesRegex(core.LKSUError, "requires at least one"):
