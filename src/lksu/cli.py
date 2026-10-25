@@ -282,8 +282,10 @@ def main(argv=None):
                 raise core.LKSUError("Debian-family backend requires Debian or Ubuntu")
             if os.geteuid():
                 raise core.LKSUError("Root required")
-            if args.command == "debian-kernel-stage" and not cfg.get("recovery_ready"):
-                raise core.LKSUError("Snapshot and provider console recovery must be confirmed")
+            if args.command == "debian-kernel-apply" and cfg.get("policy") != "all-stable":
+                raise core.LKSUError("Debian kernel installation currently requires all-stable policy")
+            if args.command == "debian-kernel-stage":
+                core.auto_reboot_preflight(cfg)
             with core.kernel_operation_lock():
                 if args.command == "debian-kernel-apply":
                     result = debian_backend.apply_managed(
