@@ -69,7 +69,7 @@ if [[ "${KERNEL_UPGRADE_TEST:-0}" == 1 ]]; then
   fi
   echo "Installing official Debian kernel meta-package in disposable guest (no host changes)."
   ssh "${ssh_opts[@]}" lksutest@127.0.0.1 \
-    'sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y linux-image-amd64' \
+    'sudo timeout 900 env DEBIAN_FRONTEND=noninteractive apt-get update -qq && sudo timeout 1200 env DEBIAN_FRONTEND=noninteractive apt-get install -y linux-image-amd64' \
     > guest-package-install.log 2>&1 || { tail -60 guest-package-install.log; exit 1; }
   ssh "${ssh_opts[@]}" lksutest@127.0.0.1 'sudo dpkg-query -W -f="${Status} ${Version}\\n" linux-image-amd64; test -s "/boot/vmlinuz-$(uname -r)"' >> guest-package-install.log 2>&1 || { echo "Kernel package or old running boot image missing" >&2; exit 1; }
   echo "Debian kernel package transaction succeeded; verifying boot artifacts before reboot."
