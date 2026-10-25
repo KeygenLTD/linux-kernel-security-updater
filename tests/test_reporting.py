@@ -110,6 +110,7 @@ class CLIReportTests(unittest.TestCase):
         self.assertEqual(cli.main(["apply"]), 1)
         self.assertEqual(send.call_count, 1)
 
+    @patch("lksu.notifications.core.save")
     @patch("lksu.cli.send_report")
     @patch("lksu.cli.build_email_report", return_value=("error subject", "error body"))
     @patch("lksu.cli.core.apply", side_effect=cli.core.LKSUError("DNF unavailable"))
@@ -117,7 +118,7 @@ class CLIReportTests(unittest.TestCase):
     @patch("lksu.cli.core.kernel_operation_lock")
     @patch("lksu.notifications.NOTIFICATION_STATE")
     def test_failed_update_sends_english_error_report(
-        self, state, lock, _cfg, _apply, report, send
+        self, state, lock, _cfg, _apply, report, send, _save
     ):
         state.exists.return_value = False
         self.assertEqual(cli.main(["apply"]), 1)
