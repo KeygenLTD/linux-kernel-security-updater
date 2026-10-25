@@ -89,29 +89,49 @@ class CLIReportTests(unittest.TestCase):
         self.assertEqual(cli.main(["maintenance"]), 0)
         check.assert_called_once_with()
         apply.assert_not_called()
-        result = report.call_args.args[2]
-        self.assertEqual(result["status"], "outside-maintenance-window")
-        self.assertEqual(len(result["updates"]), 1)
-        send.assert_called_once_with(CONFIG, "English subject", "English body")
+        report.assert_not_called()
+        send.assert_not_called()
         fleet.assert_called_once()
 
     @patch("lksu.cli.send_fleet_report")
     @patch("lksu.cli.send_report", side_effect=smtplib.SMTPException("mail failed"))
     @patch("lksu.cli.build_email_report", return_value=("subject", "body"))
-    @patch("lksu.cli.core.check", return_value={"running": "old", "updates": []})
+    @patch("lksu.cli.core.apply", return_value={
+        "status": "installed-awaiting-manual-reboot",
+        "old_kernel": "old", "new_default": "/boot/vmlinuz-new"
+    })
     @patch("lksu.cli.core.config", return_value=CONFIG)
-    def test_failed_smtp_does_not_trigger_second_send(self, _cfg, _check, _report, send, _fleet):
-        self.assertEqual(cli.main(["scheduled"]), 1)
+    @patch("lksu.cli.core.kernel_operation_lock")
+    @patch("lksu.notifications.NOTIFICATION_STATE")
+    def test_failed_smtp_does_not_trigger_second_send(
+        self, state, lock, _cfg, _apply, _report, send, _fleet
+    ):
+        state.exists.return_value = False
+        self.assertEqual(cli.main(["apply"]), 1)
         self.assertEqual(send.call_count, 1)
 
     @patch("lksu.cli.send_report")
     @patch("lksu.cli.build_email_report", return_value=("error subject", "error body"))
-    @patch("lksu.cli.core.check", side_effect=cli.core.LKSUError("DNF unavailable"))
+    @patch("lksu.cli.core.apply", side_effect=cli.core.LKSUError("DNF unavailable"))
     @patch("lksu.cli.core.config", return_value=CONFIG)
-    def test_scheduled_failure_sends_english_error_report(self, _cfg, _check, report, send):
-        self.assertEqual(cli.main(["scheduled"]), 1)
+    @patch("lksu.cli.core.kernel_operation_lock")
+    @patch("lksu.notifications.NOTIFICATION_STATE")
+    def test_failed_update_sends_english_error_report(
+        self, state, lock, _cfg, _apply, report, send
+    ):
+        state.exists.return_value = False
+        self.assertEqual(cli.main(["apply"]), 1)
         self.assertEqual(report.call_args.args[2]["status"], "error")
         send.assert_called_once_with(CONFIG, "error subject", "error body")
+
+    @patch("lksu.cli.send_report")
+    @patch("lksu.cli.build_email_report")
+    @patch("lksu.cli.core.check", side_effect=cli.core.LKSUError("DNF unavailable"))
+    @patch("lksu.cli.core.config", return_value=CONFIG)
+    def test_scheduled_check_failure_does_not_email(self, _cfg, _check, report, send):
+        self.assertEqual(cli.main(["scheduled"]), 1)
+        report.assert_not_called()
+        send.assert_not_called()
 
 
 if __name__ == "__main__":
