@@ -258,12 +258,13 @@ def boot_assessment(info):
 
 
 def _is_newer_kernel(old, candidate):
-    """Use RPM's native EVR comparison; do not lexically sort kernel versions."""
-    try:
-        import rpm
-    except ImportError as exc:
-        raise LKSUError("python3-rpm is required to compare kernels before unattended adoption") from exc
+    """Use AlmaLinux system RPM bindings even when LKSU runs in a private venv.
 
+    LKSU's self-updater intentionally uses an isolated venv, where 'import rpm'
+    normally fails. The distribution's /usr/bin/python3 has python3-rpm as an
+    RPM dependency installed by LKSU's installer. Never approximate RPM EVR
+    ordering using lexicographic or generic version sorting.
+    """
     def evr(release):
         if not VERSION.fullmatch(release):
             raise LKSUError("Invalid kernel RPM release")
@@ -272,8 +273,31 @@ def _is_newer_kernel(old, candidate):
         if len(fields) != 3:
             raise LKSUError("Cannot determine installed kernel RPM version")
         epoch, version, build = fields
+        if not VERSION.fullmatch(version) or not VERSION.fullmatch(build):
+            raise LKSUError("Invalid kernel RPM EVR output")
+        if epoch != "(none)" and not epoch.isdecimal():
+            raise LKSUError("Invalid kernel RPM epoch")
         return ("0" if epoch == "(none)" else epoch, version, build)
-    return rpm.labelCompare(evr(candidate), evr(old)) > 0
+
+    newer = evr(candidate)
+    running = evr(old)
+    python = Path("/usr/bin/python3")
+    if not python.is_file():
+        raise LKSUError("System Python missing at /usr/bin/python3; cannot compare RPM kernel versions")
+    script = (
+        "import rpm, sys; "
+        "a=tuple(sys.argv[1:4]); b=tuple(sys.argv[4:7]); "
+        "print(rpm.labelCompare(a,b))"
+    )
+    cmd = run(str(python), "-c", script, *newer, *running, check=False)
+    if cmd.returncode:
+        raise LKSUError(
+            "System RPM version comparison failed (check 'dnf install python3-rpm'): "
+            + cmd.stderr.strip()[:300]
+        )
+    if cmd.stdout.strip() not in {"-1", "0", "1"}:
+        raise LKSUError("Unexpected RPM version comparison result; no boot changes made")
+    return cmd.stdout.strip() == "1"
 
 
 def adopt_preinstalled_kernel(info):
