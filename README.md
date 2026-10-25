@@ -6,6 +6,24 @@
 
 Early production-oriented release for **AlmaLinux 8, 9 and 10**. LKSU uses the distribution's enabled DNF repositories. It does not enable testing repositories, select a CVE-specific build, or download arbitrary RPMs. It requests automatic reboot only after opt-in and safety checks.
 
+## Multi-distribution roadmap (in development)
+
+Run `lksu compatibility --json` to inspect the current Linux distribution and the
+available kernel/update/boot backend **without making system changes**.
+
+| Distribution family | Detection | Unattended kernel update | Reboot and rollback |
+| --- | --- | --- | --- |
+| AlmaLinux 8/9/10 | Yes | Existing implementation | Existing guarded trial boot |
+| Rocky Linux / RHEL / CentOS Stream / Fedora | Yes | Not yet validated; blocked | Blocked |
+| Ubuntu / Debian | Yes | APT adapter not yet implemented; blocked | Blocked |
+| Arch Linux | Yes | Pacman adapter not yet implemented; blocked | Blocked |
+
+This capability inspection does **not** imply those platforms are supported.
+We will only unlock automatic updates after distro-specific kernel packaging,
+transaction, bootloader, snapshot/recovery and post-boot tests pass. A distro
+that cannot be safely identified or recovered always fails closed.
+No SSH access to production servers was used to develop this feature.
+
 ## Safety model
 
 - The interactive one-command installer defaults to `all-stable` automatic kernel updates and offers guarded automatic reboot; the operator can decline. Direct/manual setups must configure a kernel policy explicitly. The daily read-only check does not send routine emails.
