@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily LKSU application self-update check
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
