@@ -35,12 +35,12 @@ class SafeKernelCleanupTests(unittest.TestCase):
             if args[:2] == ("rpm", "-q") and args[-1] == "kernel-core":
                 # Ordered oldest, fallback, current.
                 return process(
-                    ANCIENT + " 100\\n" + FALLBACK + " 200\\n" + RUNNING + " 300\\n"
+                    ANCIENT + " 100\n" + FALLBACK + " 200\n" + RUNNING + " 300\n"
                 )
             if args[:2] == ("rpm", "-q"):
                 candidate = args[-1]
                 if candidate.endswith(ANCIENT) and not candidate.startswith("kernel-modules-extra-"):
-                    return process(candidate + "\\n")
+                    return process(candidate + "\n")
                 return process(returncode=1)
             if args[:3] == ("rpm", "-e", "--test"):
                 rpm_erasures.append(args)
@@ -123,7 +123,7 @@ class SafeKernelCleanupTests(unittest.TestCase):
 
     def test_unexpected_exact_package_match_fails_closed(self):
         with patch.object(core, "run", return_value=process(
-            "kernel-core-" + RUNNING + "\\n"
+            "kernel-core-" + RUNNING + "\n"
         )):
             with self.assertRaisesRegex(core.LKSUError, "Unexpected kernel package match"):
                 kernel_cleanup._exact_installed_packages(ANCIENT)
