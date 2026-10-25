@@ -14,6 +14,7 @@ from .fleet import send_report as send_fleet_report
 from .policy import in_maintenance_window
 from .reporting import build_email_report
 from .security import check as security_check, create_baseline
+from . import self_update
 
 
 def setup():
@@ -51,6 +52,7 @@ def setup():
         return value in {"y", "yes"}
 
     automatic_updates = yes_no("Enable automatic kernel updates?", False)
+    automatic_lksu_updates = yes_no("Automatically install verified LKSU releases?", False)
     notifications = yes_no("Send an email after every check/update?", True)
     automatic_reboot = yes_no("Enable automatic reboot?", False)
     use_window = yes_no("Use a maintenance window?", False)
@@ -70,7 +72,8 @@ def setup():
     core.save(core.CONFIG, {"email": email, "from_email": email, "smtp_host": host, "smtp_port": port,
                             "smtp_user": user, "smtp_password": password, "policy": policy,
                             "services": parsed, "health_urls": parsed_urls,
-                            "automatic_updates": automatic_updates, "notifications": notifications,
+                            "automatic_updates": automatic_updates, "automatic_lksu_updates": automatic_lksu_updates,
+                            "recovery_ready": False, "notifications": notifications,
                             "automatic_reboot": automatic_reboot,
                             "maintenance_window": {"enabled": use_window, "start": start, "duration_minutes": duration},
                             "security_watch": {"required_services": ["auditd", "firewalld"],
@@ -102,7 +105,7 @@ def send_report(cfg, subject, body):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="AlmaLinux Kernel Security Updater")
-    parser.add_argument("command", choices=("configure", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check"))
+    parser.add_argument("command", choices=("configure", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check", "self-update", "self-update-check", "self-update-scheduled"))
     args = parser.parse_args(argv)
     reboot_requested = False
     mail_failure = None
@@ -113,7 +116,12 @@ def main(argv=None):
             setup()
             return 0
         cfg = core.config()
-        if args.command == "security-baseline":
+        if args.command == "self-update-check":
+            result = self_update.check()
+        elif args.command in {"self-update", "self-update-scheduled"}:
+            result = self_update.update(automatic=args.command == "self-update-scheduled",
+                                        enabled=cfg.get("automatic_lksu_updates", False))
+        elif args.command == "security-baseline":
             if os.geteuid(): raise core.LKSUError("Root required")
             result = {"status": "baseline-created", "baseline": create_baseline(cfg)}
         elif args.command == "security-check":
@@ -149,7 +157,7 @@ def main(argv=None):
             result = {"old_default": core.select_old(), "rebooted": False}
         output = json.dumps(result, indent=2)
         print(output)
-        routine_reports = args.command in {"scheduled", "apply", "maintenance", "stage-reboot", "verify"}
+        routine_reports = args.command in {"scheduled", "apply", "maintenance", "stage-reboot", "verify", "self-update", "self-update-scheduled"}
         if (routine_reports and cfg.get("notifications", True)) or (args.command == "security-check" and result["alerts"]):
             subject, body = build_email_report(cfg, args.command, result)
             report_attempted = True
@@ -169,7 +177,7 @@ def main(argv=None):
         print(f"LKSU error: {exc}", file=sys.stderr)
         # Report failed scheduled actions too, without retrying a failed SMTP send.
         if cfg is not None and not report_attempted and cfg.get("notifications", True) and args.command in {
-            "scheduled", "apply", "maintenance", "stage-reboot", "verify", "security-check"
+            "scheduled", "apply", "maintenance", "stage-reboot", "verify", "security-check", "self-update", "self-update-scheduled"
         }:
             try:
                 subject, body = build_email_report(cfg, args.command, {"status": "error", "error": str(exc)})
