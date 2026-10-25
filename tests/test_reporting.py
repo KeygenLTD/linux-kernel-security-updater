@@ -68,11 +68,15 @@ class ReportTests(unittest.TestCase):
 
 
 class MaintenancePolicyTests(unittest.TestCase):
-    def test_disabled_window_never_authorizes_automatic_installation(self):
+    def test_explicit_no_window_permits_automatic_installation(self):
         from lksu.policy import in_maintenance_window
-        disabled = {"maintenance_window": {"enabled": False, "start": "02:00", "duration_minutes": 60}}
-        now = datetime(2026, 10, 25, 2, 30, tzinfo=timezone.utc)
-        self.assertFalse(in_maintenance_window(disabled, now=now))
+        anytime = {"maintenance_window": {"enabled": False, "start": "02:00", "duration_minutes": 60}}
+        now = datetime(2026, 10, 25, 22, 30, tzinfo=timezone.utc)
+        self.assertTrue(in_maintenance_window(anytime, now=now))
+
+    def test_missing_window_does_not_authorize_automatic_installation(self):
+        from lksu.policy import in_maintenance_window
+        self.assertFalse(in_maintenance_window({}, now=datetime(2026, 10, 25, tzinfo=timezone.utc)))
 
 
 class CLIReportTests(unittest.TestCase):
