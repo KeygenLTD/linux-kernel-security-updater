@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.3.18 — Continuous kernel automation (maintenance-window removal)
+
+- Remove all time-of-day restriction prompts and window evaluation, including the old 03:00/60-minute defaults. Every enabled LKSU kernel timer invocation can assess updates at any hour (15-minute systemd cadence).
+- Automatically remove the retired `maintenance_window` key from existing root-only configuration on the next LKSU read. Preserve SMTP credentials, automatic install/reboot opt-ins, recovery readiness, security policy, health checks and unrelated settings.
+- Keep guarded kernel RPM installation, free-space recovery, previous-kernel preservation, one-shot GRUB trial boot, provider-snapshot approval, service/URL health verification, post-boot promotion and rollback tooling unchanged.
+- Refresh English console/email reports, documentation and regression tests. No direct server update, reboot or v0.3.18 live-host validation is implied by this release.
+
+### Upgrade notes
+
+Existing hosts that previously had a restricted window will now run **authorized** kernel install/reboot operations at any time once the release is activated and the timer fires. There is no longer a quiet-hours gate; confirm outage acceptance and existing `recovery_ready` and service-health settings before upgrading. LKSU **does not create VM snapshots**: the operator must maintain a real snapshot/provider console.
+
 ## v0.3.17 — Kernel lifecycle automation
 
 - **Anytime eligible updates:** an explicitly unrestricted maintenance policy is evaluated every 15 minutes. Existing saved maintenance windows are preserved until an operator changes them.
