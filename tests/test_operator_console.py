@@ -116,6 +116,7 @@ class ConsoleTests(unittest.TestCase):
         data["services"] = []
         data["health_urls"] = []
         data["recovery_ready"] = True
+        data["automatic_reboot"] = True
         config.return_value = data
         def response(message):
             if message.startswith("Services to check"):
