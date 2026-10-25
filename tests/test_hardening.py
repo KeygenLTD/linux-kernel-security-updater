@@ -1,5 +1,6 @@
 """Regression tests for root-only file and updater safety policies."""
 import os
+import ast
 import stat
 import tempfile
 import unittest
@@ -59,14 +60,14 @@ class PrivilegedHostHardening(unittest.TestCase):
                 core.save(base / "linked" / "state.json", {"x": 1})
 
     def test_self_update_subprocess_drops_inherited_python_hooks(self):
-        with patch.dict(os.environ, {"PYTHONPATH": "/tmp/injected", "LD_PRELOAD": "/tmp/lib.so", "PIP_CONFIG_FILE": "/tmp/pip.conf"}), patch(
+        with patch.dict(os.environ, {"PYTHONPATH": "/tmp/injected", "LD_PRELOAD": "/tmp/lib.so", "PIP_CONFIG_FILE": "/tmp/pip.conf", "PIP_TARGET": "/tmp/hijack"}), patch(
             "lksu.self_update.subprocess.run"
         ) as run:
             run.return_value.returncode = 0
             run.return_value.stdout = "0.3.17\n"
             self_update._cmd("/usr/bin/python3", "-V")
         child = run.call_args.kwargs["env"]
-        for key in ("PYTHONPATH", "LD_PRELOAD", "PIP_CONFIG_FILE"):
+        for key in ("PYTHONPATH", "LD_PRELOAD", "PIP_CONFIG_FILE", "PIP_TARGET"):
             self.assertNotIn(key, child)
 
     def test_self_update_rejects_symlinked_root(self):
@@ -97,6 +98,25 @@ class PrivilegedHostHardening(unittest.TestCase):
             }}, {"status": "updated"})
         self.assertEqual(result, 202)
         self.assertTrue(network.call_args.args[0].full_url.startswith("https://"))
+
+
+    def test_codebase_avoids_dynamic_eval_and_shell_commands(self):
+        source = Path(__file__).resolve().parents[1] / "src" / "lksu"
+        found = []
+        for file in source.glob("*.py"):
+            tree = ast.parse(file.read_text(), filename=str(file))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                if isinstance(node.func, ast.Name) and node.func.id in {"eval", "exec"}:
+                    found.append("{}:{} calls {}".format(file.name, node.lineno, node.func.id))
+                if isinstance(node.func, ast.Attribute) and node.func.attr in {
+                    "run", "Popen", "call", "check_output", "check_call",
+                }:
+                    if any(kw.arg == "shell" and isinstance(kw.value, ast.Constant)
+                           and kw.value.value is True for kw in node.keywords):
+                        found.append("{}:{} executes a shell".format(file.name, node.lineno))
+        self.assertEqual(found, [], "Review privileged execution sinks before release")
 
 
 if __name__ == "__main__":
