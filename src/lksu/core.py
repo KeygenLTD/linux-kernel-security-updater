@@ -111,6 +111,7 @@ def check():
     info["updates"] = updates()
     from .policy import security_advisories
     info["security_advisories"] = security_advisories()
+    info.update(boot_assessment(info))
     return info
 
 
@@ -143,15 +144,13 @@ def apply(policy):
 
 
 def verify(cfg):
-    if not STATE.exists():
-        raise LKSUError("No pending update")
-    state = json.loads(STATE.read_text())
-    if not state.get("pending"):
-        raise LKSUError("No pending update")
+    state = pending_update()
+    if state is None:
+        return {"status": "no-pending-verification", "healthy": True, "verification_performed": False}
     running = os.uname().release
     from .health import check_all
     results = check_all(cfg)
-    healthy = running == state["new_default"].removeprefix("/boot/vmlinuz-") and all(results.values())
+    healthy = bool(results) and running == state["new_default"].removeprefix("/boot/vmlinuz-") and all(results.values())
     report = {"healthy": healthy, "running": running, "services": results, "old_kernel": state["old_kernel"]}
     if healthy:
         run("grubby", "--set-default", state["new_default"])
@@ -172,8 +171,18 @@ def stage_trial_boot():
     state = json.loads(STATE.read_text())
     if not state.get("pending"):
         raise LKSUError("No pending update")
+    if state.get("trial_entry"):
+        raise LKSUError("Trial boot already staged; manual inspection required before retry")
     old_image = f"/boot/vmlinuz-{state['old_kernel']}"
     new_image = state["new_default"]
+    available = installed()
+    for image in (old_image, new_image):
+        release = image.removeprefix("/boot/vmlinuz-")
+        if not image.startswith("/boot/vmlinuz-") or not VERSION.fullmatch(release):
+            raise LKSUError("Invalid saved kernel path; refusing boot changes")
+        if release not in available or not Path(image).is_file():
+            raise LKSUError(f"Kernel RPM or image missing: {release}")
+        run("grubby", "--info", image)
     run("grubby", "--set-default", old_image)
     if default_kernel() != old_image:
         raise LKSUError("Could not preserve old kernel as persistent default")
@@ -201,3 +210,120 @@ def select_old():
     if default_kernel() != image:
         raise LKSUError("Failed to verify old kernel as default")
     return image
+
+
+def pending_update():
+    """Read an existing LKSU operation; never infer a completed rollback."""
+    if not STATE.exists():
+        return None
+    state = json.loads(STATE.read_text())
+    if not isinstance(state, dict):
+        raise LKSUError("Invalid update state")
+    return state if state.get("pending") else None
+
+
+def boot_assessment(info):
+    """Expose installed-but-not-running boot target without claiming an RPM upgrade."""
+    current = info["running"]
+    default = info["default"]
+    candidate = default.removeprefix("/boot/vmlinuz-")
+    if default == f"/boot/vmlinuz-{current}":
+        return {"boot_status": "current", "reboot_required": False}
+    if not default.startswith("/boot/vmlinuz-") or not VERSION.fullmatch(candidate):
+        return {"boot_status": "unverified-default", "reboot_required": False}
+    versions = installed()
+    if candidate not in versions or not Path(default).is_file():
+        return {"boot_status": "unverified-default", "reboot_required": False, "reboot_target": candidate}
+    return {"boot_status": "different-installed-kernel", "reboot_required": True, "reboot_target": candidate}
+
+
+def _is_newer_kernel(old, candidate):
+    """Use RPM's native EVR comparison; do not lexically sort kernel versions."""
+    try:
+        import rpm
+    except ImportError as exc:
+        raise LKSUError("python3-rpm is required to compare kernels before unattended adoption") from exc
+
+    def evr(release):
+        if not VERSION.fullmatch(release):
+            raise LKSUError("Invalid kernel RPM release")
+        reply = run("rpm", "-q", "--qf", "%{EPOCH} %{VERSION} %{RELEASE}\\n", "kernel-core-" + release)
+        fields = reply.stdout.strip().split()
+        if len(fields) != 3:
+            raise LKSUError("Cannot determine installed kernel RPM version")
+        epoch, version, build = fields
+        return ("0" if epoch == "(none)" else epoch, version, build)
+    return rpm.labelCompare(evr(candidate), evr(old)) > 0
+
+
+def adopt_preinstalled_kernel(info):
+    """Record a separately installed NEWER default kernel; never install or reboot."""
+    if pending_update() is not None:
+        raise LKSUError("Existing pending update requires verification first")
+    if not info.get("reboot_required") or info.get("boot_status") != "different-installed-kernel":
+        raise LKSUError("No verified different installed boot target")
+    old = info["running"]
+    target = info["reboot_target"]
+    if not _is_newer_kernel(old, target):
+        raise LKSUError("Default kernel is not newer than running kernel; refusing unattended boot")
+    for release in (old, target):
+        image = f"/boot/vmlinuz-{release}"
+        if release not in installed() or not Path(image).is_file():
+            raise LKSUError("Kernel RPM or boot image unavailable: " + release)
+        run("grubby", "--info", image)
+    if not Path(f"/boot/initramfs-{target}.img").is_file():
+        raise LKSUError("Target kernel initramfs is missing")
+    state = {
+        "pending": True, "old_kernel": old,
+        "new_default": f"/boot/vmlinuz-{target}",
+        "installed": installed(), "updated_at": int(time.time()),
+        "source": "adopted-preinstalled-kernel",
+    }
+    save(STATE, state)
+    return {"status": "installed-awaiting-manual-reboot", **state}
+
+
+def auto_reboot_preflight(cfg):
+    """Fail closed until human-approved recovery and meaningful health checks exist."""
+    if not cfg.get("recovery_ready", False):
+        raise LKSUError("Automatic reboot blocked: set recovery_ready=true only after confirming an external snapshot and provider-console recovery")
+    if not cfg.get("services") and not cfg.get("health_urls"):
+        raise LKSUError("Automatic reboot blocked: configure service or HTTP health checks first")
+    from .health import check_all
+    checks = check_all(cfg)
+    if not checks or not all(checks.values()):
+        raise LKSUError("Automatic reboot blocked: pre-reboot health checks failed")
+    verify_unit = run("systemctl", "is-enabled", "lksu-verify.service", check=False)
+    if verify_unit.returncode or verify_unit.stdout.strip() not in {"enabled", "enabled-runtime"}:
+        raise LKSUError("Automatic reboot blocked: lksu-verify.service must be enabled")
+    return checks
+
+
+def maintenance(cfg):
+    """Install eligible updates or safely adopt a pre-installed kernel at maintenance time."""
+    state = pending_update()
+    if state:
+        result = check()
+        result["status"] = "trial-boot-staged" if state.get("trial_entry") else "reboot-required"
+        result["old_kernel"] = state.get("old_kernel")
+        result["new_default"] = state.get("new_default")
+        if result["running"] == state.get("new_default", "").removeprefix("/boot/vmlinuz-"):
+            result["status"] = "verification-pending"
+    elif cfg.get("automatic_updates") and cfg.get("policy") != "check-only":
+        result = apply(cfg["policy"])
+    else:
+        result = check()
+    if not cfg.get("automatic_reboot"):
+        return result, False
+    if result.get("status") in {"trial-boot-staged", "verification-pending"}:
+        return result, False
+    is_pending = result.get("status") == "reboot-required" or result.get("status") == "installed-awaiting-manual-reboot"
+    adopt = result.get("reboot_required") and not is_pending
+    if not is_pending and not adopt:
+        return result, False
+    auto_reboot_preflight(cfg)
+    if adopt:
+        result = {**result, **adopt_preinstalled_kernel(result)}
+    result["trial_boot"] = stage_trial_boot()
+    result["status"] = "trial-boot-staged"
+    return result, True
