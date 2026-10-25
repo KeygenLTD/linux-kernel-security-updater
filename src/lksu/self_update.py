@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import subprocess
+import stat
 import sys
 import tempfile
 import urllib.error
@@ -108,8 +109,15 @@ def _download(info, destination):
 
 
 def _cmd(*args):
+    # Explicitly discard environment hooks that could inject Python modules,
+    # shared libraries or alternative binaries into a root-run release check.
+    env = os.environ.copy()
+    for key in ("PYTHONPATH", "PYTHONHOME", "LD_PRELOAD", "LD_LIBRARY_PATH", "BASH_ENV", "ENV", "PIP_CONFIG_FILE"):
+        env.pop(key, None)
+    env["PATH"] = "/usr/sbin:/usr/bin:/sbin:/bin"
     try:
-        p = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=180)
+        p = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                           text=True, timeout=180, env=env)
     except subprocess.TimeoutExpired as exc:
         raise LKSUError("Self-update command timed out") from exc
     if p.returncode:
@@ -179,12 +187,23 @@ def check():
             "update_available": newer}
 
 
+def _check_root_directory(path):
+    if path.is_symlink():
+        raise LKSUError("Refusing linked LKSU installation directory")
+    info = path.stat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+        raise LKSUError("LKSU installation directory must be root-owned and not writable by non-root users")
+
+
 def update(*, automatic=False, enabled=False):
     if automatic and not enabled:
         return {"status": "self-update-disabled", "installed_version": installed_version()}
     if os.geteuid() != 0:
         raise LKSUError("Root privileges are required for LKSU self-update")
+    if ROOT.is_symlink():
+        raise LKSUError("Refusing linked LKSU installation root")
     ROOT.mkdir(parents=True, exist_ok=True)
+    _check_root_directory(ROOT)
     with open(ROOT / ".self-update.lock", "a+") as lock:
         try:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -201,6 +220,7 @@ def update(*, automatic=False, enabled=False):
             return {"status": "self-update-current", "installed_version": current, "release_version": info["tag"]}
         stage_root = ROOT / "releases"
         stage_root.mkdir(parents=True, exist_ok=True)
+        _check_root_directory(stage_root)
         target = stage_root / info["tag"]
         if target.exists():
             raise LKSUError("Release directory already exists; manual investigation required")
