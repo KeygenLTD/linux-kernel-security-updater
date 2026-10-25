@@ -34,14 +34,9 @@ def run(*args, check=True, timeout=120):
 
 
 def os_version():
-    data = {}
-    for line in Path("/etc/os-release").read_text().splitlines():
-        if "=" in line:
-            k, v = line.split("=", 1)
-            data[k] = v.strip('"')
-    if data.get("ID") != "almalinux" or data.get("VERSION_ID", "").split(".")[0] not in {"8", "9", "10"}:
-        raise LKSUError("Only AlmaLinux 8, 9 and 10 are supported")
-    return data["VERSION_ID"]
+    # No guessed family compatibility: activation requires a verified backend.
+    from .distributions import detect, require_automatic_kernel_backend
+    return require_automatic_kernel_backend(detect()).version
 
 
 def config():
