@@ -50,7 +50,7 @@ class DistributionTests(unittest.TestCase):
         }
         for identifier, (family, package_manager) in cases.items():
             with self.subTest(identifier=identifier):
-                distro = self.identify("ID=" + identifier + "\\nVERSION_ID=9\\n")
+                distro = self.identify("ID=" + identifier + "\nVERSION_ID=9\n")
                 self.assertEqual(distro.family, family)
                 self.assertEqual(distro.package_manager, package_manager)
                 self.assertEqual(distro.reboot_capability, "blocked")
@@ -60,7 +60,7 @@ class DistributionTests(unittest.TestCase):
     def test_cloudlinux_9_never_inherits_almalinux_reboot_permission(self):
         for major in ("8", "9", "10"):
             with self.subTest(major=major):
-                distro = self.identify("ID=cloudlinux\\nID_LIKE=\"rhel fedora\"\\nVERSION_ID=" + major + "\\n")
+                distro = self.identify("ID=cloudlinux\nID_LIKE=\"rhel fedora\"\nVERSION_ID=" + major + "\n")
                 self.assertEqual(distro.update_capability, "not-validated")
                 with self.assertRaises(core.LKSUError):
                     require_automatic_kernel_backend(distro)
