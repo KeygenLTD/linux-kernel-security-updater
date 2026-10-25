@@ -59,9 +59,9 @@ class BootLifecycleTests(unittest.TestCase):
             return p
         with patch.object(core.Path, "is_file", return_value=True), patch.object(
             core, "run", side_effect=[
-                proc("(none) 6.12.0 211.68.1.el10_2\\n"),
-                proc("(none) 6.12.0 211.51.1.el10_2\\n"),
-                proc("1\\n"),
+                proc("(none) 6.12.0 211.68.1.el10_2\n"),
+                proc("(none) 6.12.0 211.51.1.el10_2\n"),
+                proc("1\n"),
             ]
         ) as run:
             self.assertTrue(core._is_newer_kernel(RUNNING, NEWER))
@@ -84,8 +84,8 @@ class BootLifecycleTests(unittest.TestCase):
             return r
         with patch.object(core.Path, "is_file", return_value=True), patch.object(
             core, "run", side_effect=[
-                reply("(none) 6.12.0 211.68.1.el10_2\\n"),
-                reply("(none) 6.12.0 211.51.1.el10_2\\n"),
+                reply("(none) 6.12.0 211.68.1.el10_2\n"),
+                reply("(none) 6.12.0 211.51.1.el10_2\n"),
                 reply("", returncode=1, stderr="ModuleNotFoundError: No module named 'rpm'"),
             ]
         ):
