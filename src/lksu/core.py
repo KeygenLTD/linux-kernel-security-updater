@@ -341,7 +341,14 @@ def maintenance(cfg):
     adopt = result.get("reboot_required") and not is_pending
     if not is_pending and not adopt:
         return result, False
-    auto_reboot_preflight(cfg)
+    try:
+        auto_reboot_preflight(cfg)
+    except LKSUError as exc:
+        # Installation may already have completed; make the deferred reboot
+        # visible rather than silently pretending the kernel is active.
+        result["status"] = "reboot-blocked"
+        result["reboot_block_reason"] = str(exc)
+        return result, False
     if adopt:
         result = {**result, **adopt_preinstalled_kernel(result)}
     result["trial_boot"] = stage_trial_boot()
