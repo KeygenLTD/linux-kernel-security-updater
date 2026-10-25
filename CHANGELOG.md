@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.21 — Read-only kernel inventory on Ubuntu and RPM families
+
+- Add `lksu kernel-inventory --json` to inspect installed APT kernel image packages on Ubuntu/Debian and RPM kernel packages on RHEL/CloudLinux families.
+- Run command on a live GitHub Ubuntu CI runner, with unit tests on Python 3.9/3.11/3.13.
+- Maintain fail-closed guard: automatic kernel installation and trial reboot on additional distributions are NOT implemented or enabled.
+- No disposable-VM reboot/rollback tests; no claim of full non-AlmaLinux support.
+
+
 ## v0.3.20 — Extended Linux distribution identification (v1 groundwork)
 
 - Add read-only CloudLinux, SUSE, Alpine, Gentoo, NixOS, Void and additional RHEL/Debian/Arch derivative identification.
