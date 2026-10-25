@@ -1,0 +1,40 @@
+name: publish LKSU wheel
+on:
+  push:
+    tags:
+      - "v[0-9]*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Test
+        run: |
+          python -m pip install --upgrade build
+          python -m pip install -e .
+          python -m unittest discover -s tests -v
+      - name: Verify tag matches package version
+        run: |
+          python - <<'PY'
+          import os, pathlib, re
+          tag=os.environ["GITHUB_REF_NAME"]
+          text=pathlib.Path("pyproject.toml").read_text()
+          match=re.search(r'^version\s*=\s*"([^"]+)"', text, re.M)
+          if not match or tag != "v"+match.group(1):
+              raise SystemExit("Tag/version mismatch; refusing release")
+          PY
+      - name: Build a versioned wheel
+        run: python -m build --wheel --outdir dist
+      - name: Publish wheel as GitHub Release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(find dist -maxdepth 1 -name '*.whl' | wc -l)" -eq 1
+          gh release create "$GITHUB_REF_NAME" dist/*.whl --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
