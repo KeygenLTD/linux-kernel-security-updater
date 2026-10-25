@@ -182,6 +182,11 @@ def build_email_report(cfg, command, result, *, timestamp=None, hostname=None, o
         "Maintenance action: " + ("Skipped - outside maintenance window" if result.get("status") == "outside-maintenance-window" else "See operation and result above"),
         "Next scheduled check: Not determined here; inspect systemctl list-timers on the host.",
     ]
+    removed = result.get("cleaned_old_kernels")
+    if isinstance(removed, list) and removed:
+        lines.extend(["", "Old kernel cleanup", "------------------"])
+        for release in removed[:10]:
+            lines.append("- Removed obsolete kernel RPMs: " + str(release)[:120])
     if isinstance(updates, list) and updates:
         lines.extend(["", "Available kernel packages", "-------------------------"])
         for item in updates[:30]:
@@ -266,6 +271,10 @@ def format_console_report(cfg, command, result):
         lines.append("Automatic reboot: " + ("Enabled (subject to safety checks)" if cfg.get("automatic_reboot") else "Disabled"))
         lines.append("Maintenance:      " + _window_description(cfg))
     lines.append("LKSU self-update: " + ("Enabled" if cfg.get("automatic_lksu_updates") else "Disabled"))
+    if isinstance(result.get("cleaned_old_kernels"), list) and result["cleaned_old_kernels"]:
+        lines.append("Old kernels cleaned: " + ", ".join(
+            str(release)[:100] for release in result["cleaned_old_kernels"][:10]
+        ))
     if result.get("reboot_block_reason"):
         lines.append("Reboot blocked:   " + str(result["reboot_block_reason"])[:500])
     if result.get("error"):

@@ -23,8 +23,9 @@ class KernelTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=".") as temp:
             state = Path(temp) / "state.json"
             with patch.object(core, "STATE", state), patch.object(core, "check", return_value={
-                "running": "old", "updates": [{"name": "kernel-core", "evr": "new", "arch": "x86_64"}]
-            }), patch.object(core, "run") as run, patch.object(core, "installed", return_value=["old", "new"]), patch.object(
+                "running": "old", "boot_free_mib": 650,
+                "updates": [{"name": "kernel-core", "evr": "new", "arch": "x86_64"}]
+            }), patch.object(core, "preflight"), patch.object(core, "run") as run, patch.object(core, "installed", return_value=["old", "new"]), patch.object(
                 core, "default_kernel", return_value="/boot/vmlinuz-new"
             ), patch.object(core.Path, "exists", autospec=True, side_effect=lambda path: str(path).replace("\\", "/").endswith("/boot/vmlinuz-old")):
                 result = core.apply("all-stable")
