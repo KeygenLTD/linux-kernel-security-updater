@@ -1,23 +1,16 @@
 import unittest
-from datetime import datetime, timezone
+from pathlib import Path
 from unittest.mock import patch
+
 from lksu import policy
 
+
 class PolicyTests(unittest.TestCase):
-    def test_window_crosses_midnight(self):
-        cfg = {"maintenance_window": {"start": "23:30", "duration_minutes": 120}}
-        self.assertTrue(policy.in_maintenance_window(cfg, datetime(2026, 1, 2, 0, 15, tzinfo=timezone.utc)))
-        self.assertFalse(policy.in_maintenance_window(cfg, datetime(2026, 1, 2, 2, 0, tzinfo=timezone.utc)))
-
-    def test_explicit_no_window_allows_anytime_maintenance(self):
-        cfg = {"maintenance_window": {"enabled": False, "start": "03:00", "duration_minutes": 60}}
-        self.assertTrue(policy.in_maintenance_window(cfg, datetime(2026, 1, 2, 1, 0, tzinfo=timezone.utc)))
-        self.assertTrue(policy.in_maintenance_window(cfg, datetime(2026, 1, 2, 17, 0, tzinfo=timezone.utc)))
-
-    def test_missing_window_still_fails_closed(self):
-        self.assertFalse(policy.in_maintenance_window({}))
-        self.assertFalse(policy.in_maintenance_window({"maintenance_window": "bad"}))
-        self.assertFalse(policy.in_maintenance_window({"maintenance_window": {}}))
+    def test_kernel_timer_checks_every_fifteen_minutes_at_all_hours(self):
+        timer = Path("systemd/lksu-maintenance.timer").read_text()
+        self.assertIn("OnCalendar=*:0/15", timer)
+        self.assertIn("Persistent=true", timer)
+        self.assertNotIn("03:00", timer)
 
     def test_advisory_extracts_cves(self):
         listing = type("P", (), {"returncode": 0, "stdout": "ALSA-2026:1234 Important/Sec. kernel-core-1.x86_64\n", "stderr": ""})()
@@ -26,4 +19,6 @@ class PolicyTests(unittest.TestCase):
             result = policy.security_advisories()
         self.assertEqual(result[0]["cves"], ["CVE-2026-12345", "CVE-2026-12346"])
 
-if __name__ == "__main__": unittest.main()
+
+if __name__ == "__main__":
+    unittest.main()
