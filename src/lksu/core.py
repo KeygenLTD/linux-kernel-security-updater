@@ -74,7 +74,7 @@ def default_kernel():
     return value
 
 
-def preflight():
+def preflight(require_boot_space=True):
     version = os_version()
     for binary in ("dnf", "rpm", "grubby", "findmnt", "systemctl"):
         if not shutil.which(binary):
@@ -84,7 +84,7 @@ def preflight():
     if run("findmnt", "-n", "-o", "OPTIONS", "/boot", check=False).returncode == 0:
         pass  # /boot may also be part of /; disk_usage handles either layout.
     boot = shutil.disk_usage("/boot")
-    if boot.free < 500 * 1024 * 1024:
+    if require_boot_space and boot.free < 500 * 1024 * 1024:
         raise LKSUError("Less than 500 MiB free on /boot")
     if not Path("/boot/grub2/grub.cfg").exists() and not Path("/boot/efi/EFI/almalinux/grub.cfg").exists():
         raise LKSUError("GRUB configuration not found")
@@ -110,8 +110,8 @@ def updates():
     return found
 
 
-def check():
-    info = preflight()
+def check(require_boot_space=True):
+    info = preflight(require_boot_space=require_boot_space)
     info["updates"] = updates()
     from .policy import security_advisories
     info["security_advisories"] = security_advisories()
@@ -122,7 +122,8 @@ def check():
 def apply(policy):
     if policy not in {"all-stable", "security-only"}:
         raise LKSUError("Installation requires policy=all-stable or security-only")
-    before = check()
+    # Determine eligibility without treating low /boot as an unrecoverable error.
+    before = check(require_boot_space=False)
     if policy == "security-only" and not before["security_advisories"]:
         return {"status": "no-security-updates", **before}
     if not before["updates"]:
@@ -130,6 +131,12 @@ def apply(policy):
     if STATE.exists() and json.loads(STATE.read_text()).get("pending"):
         raise LKSUError("Prior update still awaits post-boot verification")
     old = before["running"]
+    removed_old_kernels = []
+    if before.get("boot_free_mib", 500) < 500:
+        from .kernel_cleanup import reclaim_for_update
+        removed_old_kernels = reclaim_for_update()
+    # Validate free space, GRUB and the running kernel again before DNF.
+    preflight()
     # Preserve the exact running kernel and its installed modules against DNF's installonly cleanup.
     # DNF installonly_limit is overridden for this transaction; never erase old RPMs here.
     command = ["dnf", "-y", "--setopt=installonly_limit=0", "upgrade"]
@@ -144,7 +151,8 @@ def apply(policy):
         raise LKSUError("New kernel was not selected as default; inspect DNF result")
     state = {"pending": True, "old_kernel": old, "new_default": chosen, "installed": after, "updated_at": int(time.time())}
     save(STATE, state)
-    return {"status": "installed-awaiting-manual-reboot", **state}
+    return {"status": "installed-awaiting-manual-reboot", **state,
+            "cleaned_old_kernels": removed_old_kernels}
 
 
 def verify(cfg):
