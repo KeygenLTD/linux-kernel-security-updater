@@ -224,9 +224,9 @@ def send_report(cfg, subject, body):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="AlmaLinux Kernel Security Updater")
+    parser = argparse.ArgumentParser(description="Linux Kernel Security Updater")
     parser.add_argument("--json", action="store_true", help="Print the full machine-readable report instead of an operator summary")
-    parser.add_argument("command", choices=("compatibility", "kernel-inventory", "configure", "configure-automation", "configure-self-update", "initialize", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check", "self-update", "self-update-check", "self-update-scheduled"))
+    parser.add_argument("command", choices=("compatibility", "kernel-inventory", "debian-kernel-check", "configure", "configure-automation", "configure-self-update", "initialize", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check", "self-update", "self-update-check", "self-update-scheduled"))
     args = parser.parse_args(argv)
     reboot_requested = False
     mail_failure = None
@@ -250,6 +250,19 @@ def main(argv=None):
             else:
                 for key, value in assessment.items():
                     print(f"{key.replace('_', ' ').capitalize()}: {value}")
+            return 0
+        if args.command == "debian-kernel-check":
+            from .distributions import detect
+            from .debian_backend import check_host
+            distro = detect()
+            if distro.identifier not in {"debian", "ubuntu"}:
+                raise core.LKSUError("This command requires Debian or Ubuntu")
+            assessment = check_host(distro.identifier, os.uname().release)
+            if args.json:
+                print(json.dumps(assessment, indent=2))
+            else:
+                for key, value in assessment.items():
+                    print(f"{key}: {value}")
             return 0
         if args.command == "configure":
             setup()
