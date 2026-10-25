@@ -17,7 +17,7 @@ class ManagedTrialFailureTests(unittest.TestCase):
             with patch.object(backend, "boot_images", return_value={
                 "6.1-new": object(), "6.1-old": object()}), \
                  patch.object(backend, "grub_menu_entry", side_effect=lambda release: "advanced>new" if release == "6.1-new" else "advanced>old"), \
-                 patch.object(backend.subprocess, "run", return_value=type("R", (), {"returncode": 0, "stdout": "saved_entry=advanced>old\\n"})()), \
+                 patch.object(backend.subprocess, "run", return_value=type("R", (), {"returncode": 0, "stdout": "saved_entry=advanced>old\n"})()), \
                  patch.object(backend, "stage_one_shot",
                               side_effect=backend.DebianKernelError("GRUB failed")):
                 with self.assertRaises(backend.DebianKernelError):
@@ -33,7 +33,7 @@ class ManagedTrialFailureTests(unittest.TestCase):
                 "old_kernel": "6.1-old", "trial_entry": None}))
             with patch.object(backend, "boot_images", return_value={
                 "6.1-new": object(), "6.1-old": object()}), \
-                 patch.object(backend, "grub_menu_entry", return_value="advanced>new"), \
+                 patch.object(backend, "grub_menu_entry", side_effect=lambda release: "advanced>new" if release == "6.1-new" else "advanced>old"),\n                 patch.object(backend.subprocess, "run", return_value=type("R", (), {"returncode": 0, "stdout": "saved_entry=advanced>old\\n"})()), \
                  patch.object(backend, "stage_one_shot",
                               return_value={"candidate": "6.1-new", "rebooted": False}):
                 backend.stage_managed_trial(path)
