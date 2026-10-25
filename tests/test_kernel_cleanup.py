@@ -21,6 +21,17 @@ def disk(free):
 
 
 class SafeKernelCleanupTests(unittest.TestCase):
+    def setUp(self):
+        # CI runners are unprivileged; exercise the code under mocked root.
+        root = patch.object(kernel_cleanup.os, "geteuid", return_value=0)
+        root.start()
+        self.addCleanup(root.stop)
+
+    def test_cleanup_rejects_non_root(self):
+        with patch.object(kernel_cleanup.os, "geteuid", return_value=1000):
+            with self.assertRaisesRegex(core.LKSUError, "Root required"):
+                kernel_cleanup.reclaim_for_update()
+
     def test_no_cleanup_if_boot_free(self):
         with patch.object(kernel_cleanup.shutil, "disk_usage", return_value=disk(671 * MIB)), patch.object(
             core, "run"
