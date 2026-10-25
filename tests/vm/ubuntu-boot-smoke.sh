@@ -144,15 +144,3 @@ if [[ "${KERNEL_UPGRADE_TEST:-0}" == 1 ]]; then
 else
   echo "No kernel package installation, kernel selection or rollback occurred."
 fi
-
- | sort -V | tail -1")"
-  if [[ -z "$target_kernel" || "$target_kernel" == "$old_kernel" ]]; then
-    echo "No distinct Debian kernel available for trial." >&2
-    exit 1
-  fi
-  ssh "${ssh_opts[@]}" lksutest@127.0.0.1 'sudo update-grub' >> guest-package-install.log 2>&1 || { tail -80 guest-package-install.log; exit 1; }
-  ssh "${ssh_opts[@]}" lksutest@127.0.0.1 "sudo python3 - '$target_kernel'" < tests/vm/guest-grub-select.py >> guest-package-install.log 2>&1 || { tail -80 guest-package-install.log; exit 1; }
-  echo "Debian kernel installed and staged for one-shot boot."
-  ssh "${ssh_opts[@]}" lksutest@127.0.0.1 'find /boot -maxdepth 1 -name "vmlinuz-*" -type f -printf "%f\\n"' >> guest-package-install.log 2>&1
-
-fi
