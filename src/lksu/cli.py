@@ -15,6 +15,7 @@ from .policy import in_maintenance_window
 from .reporting import build_email_report, format_console_report
 from .security import check as security_check, create_baseline
 from . import self_update, notifications
+from .progress import event
 
 
 def yes_no(prompt, default):
@@ -141,6 +142,7 @@ def setup():
                                                "ssh_failure_threshold": 5,
                                                "watched_files": ["/etc/ssh/sshd_config", "/etc/sudoers"]}})
     print(f"Configuration saved; automatic reboot is {'enabled' if automatic_reboot else 'disabled'}.")
+    print("Configuration only: kernel installation/reboot has NOT started. Run the bootstrap installer or 'lksu initialize' for the first managed update.")
 
 
 def configure_automation():
@@ -314,6 +316,8 @@ def main(argv=None):
         else:
             print(format_console_report(cfg, args.command, result))
         routine_reports = args.command in {"initialize", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "self-update", "self-update-scheduled"}
+        if reboot_requested:
+            event("REBOOT", "Trial kernel prepared; sending event notification and recording fleet report before restart...")
         report_attempted = True
         try:
             notifications.send_event(cfg, args.command, result, send_report, build_email_report)
@@ -323,7 +327,15 @@ def main(argv=None):
         if routine_reports or args.command == "security-check":
             send_fleet_report(cfg, {"command": args.command, "result": result, "hostname": os.uname().nodename, "reported_at": int(datetime.now().timestamp())})
         if reboot_requested:
-            core.run("systemctl", "reboot")
+            target = str(result.get("new_default") or result.get("reboot_target") or "trial kernel").removeprefix("/boot/vmlinuz-")
+            event("REBOOT", "Requesting system reboot NOW for one-time trial kernel " + target +
+                  ". SSH may disconnect. Boot success is verified only after the server returns.")
+            try:
+                core.run("systemctl", "reboot")
+            except core.LKSUError as exc:
+                event("REBOOT", "Reboot request failed: " + str(exc))
+                raise
+            event("REBOOT", "systemctl accepted the reboot request. Waiting for server startup and post-boot checks.")
         if mail_failure is not None:
             return 1
         return 0 if not (args.command == "verify" and not result["healthy"]) else 2
