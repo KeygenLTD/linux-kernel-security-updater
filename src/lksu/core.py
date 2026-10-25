@@ -110,8 +110,10 @@ def updates():
     return found
 
 
-def check(require_boot_space=True):
-    info = preflight(require_boot_space=require_boot_space)
+def check():
+    # Read-only checks must remain available even if a future installation
+    # needs kernel cleanup to recover sufficient /boot space.
+    info = preflight(require_boot_space=False)
     info["updates"] = updates()
     from .policy import security_advisories
     info["security_advisories"] = security_advisories()
@@ -123,7 +125,7 @@ def apply(policy):
     if policy not in {"all-stable", "security-only"}:
         raise LKSUError("Installation requires policy=all-stable or security-only")
     # Determine eligibility without treating low /boot as an unrecoverable error.
-    before = check(require_boot_space=False)
+    before = check()
     if policy == "security-only" and not before["security_advisories"]:
         return {"status": "no-security-updates", **before}
     if not before["updates"]:
