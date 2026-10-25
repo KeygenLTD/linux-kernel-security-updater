@@ -34,9 +34,12 @@ def run(*args, check=True, timeout=120):
 
 
 def os_version():
-    # No guessed family compatibility: activation requires a verified backend.
-    from .distributions import detect, require_automatic_kernel_backend
-    return require_automatic_kernel_backend(detect()).version
+    # Package transactions must be routed through an explicitly verified backend.
+    from .backend_dispatch import backend_plan
+    plan = backend_plan()
+    if plan["backend"] != "almalinux-rpm-grub":
+        raise LKSUError("Kernel automation is not supported on this distribution")
+    return plan["version"]
 
 
 def config():
