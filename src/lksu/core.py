@@ -1,5 +1,7 @@
 """Host checks and state transitions. No shell interpolation or implicit reboot."""
 import json
+import fcntl
+from contextlib import contextmanager
 import os
 import re
 import shutil
@@ -9,6 +11,8 @@ from pathlib import Path
 
 PACKAGES = ("kernel", "kernel-core", "kernel-modules", "kernel-modules-core", "kernel-modules-extra")
 STATE = Path("/var/lib/lksu/state.json")
+INITIAL_STATE = Path("/var/lib/lksu/initial-run.json")
+KERNEL_LOCK = Path("/run/lock/lksu-kernel.lock")
 CONFIG = Path("/etc/lksu/config.json")
 VERSION = re.compile(r"^[A-Za-z0-9._+~-]+$")
 
@@ -131,7 +135,7 @@ def apply(policy):
     command = ["dnf", "-y", "--setopt=installonly_limit=0", "upgrade"]
     if policy == "security-only":
         command.append("--security")
-    run(*command, *PACKAGES)
+    run(*command, *PACKAGES, timeout=1800)
     after = installed()
     if old not in after or not Path(f"/boot/vmlinuz-{old}").exists():
         raise LKSUError("Old kernel disappeared; inspect host before reboot")
@@ -210,6 +214,22 @@ def select_old():
     if default_kernel() != image:
         raise LKSUError("Failed to verify old kernel as default")
     return image
+
+
+@contextmanager
+def kernel_operation_lock():
+    """Prevent concurrent systemd timer and installer kernel modifications."""
+    KERNEL_LOCK.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+    with KERNEL_LOCK.open("a+") as handle:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise LKSUError("Another LKSU kernel operation is running") from exc
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
 
 
 def pending_update():
@@ -321,9 +341,43 @@ def maintenance(cfg):
     adopt = result.get("reboot_required") and not is_pending
     if not is_pending and not adopt:
         return result, False
-    auto_reboot_preflight(cfg)
+    try:
+        auto_reboot_preflight(cfg)
+    except LKSUError as exc:
+        # Installation may already have completed; make the deferred reboot
+        # visible rather than silently pretending the kernel is active.
+        result["status"] = "reboot-blocked"
+        result["reboot_block_reason"] = str(exc)
+        return result, False
     if adopt:
         result = {**result, **adopt_preinstalled_kernel(result)}
     result["trial_boot"] = stage_trial_boot()
     result["status"] = "trial-boot-staged"
     return result, True
+
+
+def initial_run(cfg):
+    """Perform the first managed kernel update immediately after installer setup.
+
+    This is the sole bypass for the recurring maintenance window. Explicit
+    automatic_updates/automatic_reboot choices and reboot safety gates remain
+    mandatory. Persist the completion marker before any requested reboot.
+    """
+    if INITIAL_STATE.exists():
+        marker = json.loads(INITIAL_STATE.read_text())
+        if marker.get("completed") is True:
+            return {"status": "initial-run-completed", "completed_at": marker.get("completed_at")}, False
+        raise LKSUError("Invalid initial-run state; inspect before retry")
+    if not cfg.get("automatic_updates") and not cfg.get("automatic_reboot"):
+        result = check()
+        result["status"] = "initial-check-only"
+        reboot = False
+    else:
+        result, reboot = maintenance(cfg)
+    save(INITIAL_STATE, {
+        "completed": True,
+        "completed_at": int(time.time()),
+        "result_status": result.get("status", "checked"),
+        "reboot_requested": reboot,
+    })
+    return result, reboot

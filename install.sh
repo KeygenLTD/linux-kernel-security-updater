@@ -22,4 +22,4 @@ systemctl daemon-reload
 systemctl enable lksu-verify.service
 systemctl enable --now lksu-self-update.timer
 echo "Installed. Run: lksu configure"
-echo "No timer, automatic installation, or reboot was enabled."
+echo "Daily LKSU self-update timer enabled; kernel installation/reboot require the explicit configuration and recovery checks."

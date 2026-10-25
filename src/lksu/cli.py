@@ -12,9 +12,19 @@ from email.message import EmailMessage
 from . import core
 from .fleet import send_report as send_fleet_report
 from .policy import in_maintenance_window
-from .reporting import build_email_report
+from .reporting import build_email_report, format_console_report
 from .security import check as security_check, create_baseline
 from . import self_update
+
+
+def yes_no(prompt, default):
+    suffix = "Y/n" if default else "y/N"
+    value = input(f"{prompt} [{suffix}]: ").strip().lower()
+    if not value:
+        return default
+    if value not in {"y", "yes", "n", "no"}:
+        raise core.LKSUError("Answer y or n")
+    return value in {"y", "yes"}
 
 
 def setup():
@@ -42,25 +52,19 @@ def setup():
         raise core.LKSUError("Invalid mail provider")
     if not user or not password or not re.fullmatch(r"[A-Za-z0-9.-]+", host):
         raise core.LKSUError("Invalid mail configuration")
-    def yes_no(prompt, default):
-        suffix = "Y/n" if default else "y/N"
-        value = input(f"{prompt} [{suffix}]: ").strip().lower()
-        if not value:
-            return default
-        if value not in {"y", "yes", "n", "no"}:
-            raise core.LKSUError("Answer y or n")
-        return value in {"y", "yes"}
-
-    automatic_updates = yes_no("Enable automatic kernel updates?", False)
-    automatic_lksu_updates = yes_no("Automatically install verified LKSU releases?", False)
+    automatic_updates = yes_no("Install available kernel updates on setup and automatically thereafter?", True)
+    automatic_lksu_updates = yes_no("Automatically install verified LKSU releases?", True)
     notifications = yes_no("Send an email after every check/update?", True)
-    automatic_reboot = yes_no("Enable automatic reboot?", False)
-    use_window = yes_no("Use a maintenance window?", False)
+    automatic_reboot = yes_no("Enable automatic reboot after installing a kernel (safety checks required)?", False)
+    use_window = yes_no("Use a maintenance window for future kernel installations?", automatic_updates or automatic_reboot)
     start = input("Maintenance start [03:00]: ").strip() or "03:00" if use_window else "03:00"
     duration = int(input("Maintenance duration in minutes [60]: ").strip() or "60") if use_window else 60
-    policy = input("Install policy [check-only/security-only/all-stable] (default check-only): ").strip() or "check-only"
+    default_policy = "all-stable" if automatic_updates else "check-only"
+    policy = input(
+        f"Install policy [check-only/security-only/all-stable] (default {default_policy}): "
+    ).strip() or default_policy
     if automatic_updates and policy == "check-only":
-        policy = "security-only"
+        raise core.LKSUError("Automatic kernel installation requires security-only or all-stable")
     if policy not in {"check-only", "security-only", "all-stable"}:
         raise core.LKSUError("Invalid install policy")
     services = input("Services to verify after reboot (comma separated, optional): ").strip()
@@ -69,11 +73,15 @@ def setup():
         raise core.LKSUError("Invalid service name")
     health_urls = input("HTTP/HTTPS health URLs (comma separated, optional): ").strip()
     parsed_urls = [{"url": x.strip(), "status": 200} for x in health_urls.split(",") if x.strip()]
+    recovery_ready = False
+    if automatic_reboot:
+        print("Automatic reboot is blocked until recovery readiness is confirmed.")
+        recovery_ready = yes_no("Have you verified an external snapshot AND provider console recovery?", False)
     core.save(core.CONFIG, {"email": email, "from_email": email, "smtp_host": host, "smtp_port": port,
                             "smtp_user": user, "smtp_password": password, "policy": policy,
                             "services": parsed, "health_urls": parsed_urls,
                             "automatic_updates": automatic_updates, "automatic_lksu_updates": automatic_lksu_updates,
-                            "recovery_ready": False, "notifications": notifications,
+                            "recovery_ready": recovery_ready, "notifications": notifications,
                             "automatic_reboot": automatic_reboot,
                             "maintenance_window": {"enabled": use_window, "start": start, "duration_minutes": duration},
                             "security_watch": {"required_services": ["auditd", "firewalld"],
@@ -81,6 +89,67 @@ def setup():
                                                "ssh_failure_threshold": 5,
                                                "watched_files": ["/etc/ssh/sshd_config", "/etc/sudoers"]}})
     print(f"Configuration saved; automatic reboot is {'enabled' if automatic_reboot else 'disabled'}.")
+
+
+def configure_automation():
+    """Change kernel automation without overwriting SMTP or unrelated config."""
+    if os.geteuid():
+        raise core.LKSUError("Root required")
+    cfg = core.config()
+    update = yes_no("Automatically install kernel updates?", cfg.get("automatic_updates", False))
+    reboot = yes_no("Automatically reboot after eligible kernel updates?", cfg.get("automatic_reboot", False))
+    window = dict(cfg.get("maintenance_window") or {})
+    enabled = yes_no("Use a maintenance window for future updates?", window.get("enabled", True))
+    start = window.get("start", "03:00")
+    duration = window.get("duration_minutes", 60)
+    if enabled:
+        start = input(f"Maintenance start [{start}]: ").strip() or start
+        duration = int(input(f"Maintenance duration in minutes [{duration}]: ").strip() or str(duration))
+    cfg["automatic_updates"] = update
+    cfg["automatic_reboot"] = reboot
+    cfg["maintenance_window"] = {"enabled": enabled, "start": start, "duration_minutes": duration}
+    if update and cfg.get("policy") == "check-only":
+        policy = input("Kernel install policy [security-only/all-stable] (default all-stable): ").strip() or "all-stable"
+        if policy not in {"security-only", "all-stable"}:
+            raise core.LKSUError("Invalid install policy")
+        cfg["policy"] = policy
+    if reboot:
+        if not cfg.get("services") and not cfg.get("health_urls"):
+            names = input("Services to check before and after reboot (comma separated): ").strip()
+            parsed = [x.strip() for x in names.split(",") if x.strip()]
+            if any(not re.fullmatch(r"[A-Za-z0-9_.@-]+", x) for x in parsed):
+                raise core.LKSUError("Invalid service name")
+            cfg["services"] = parsed
+        cfg["recovery_ready"] = yes_no(
+            "Have you verified a current external snapshot AND provider console recovery?",
+            cfg.get("recovery_ready", False),
+        )
+    else:
+        cfg["recovery_ready"] = False
+    from .policy import in_maintenance_window
+    # Validate the schedule, but do not require it to be open now.
+    if enabled:
+        from datetime import datetime
+        in_maintenance_window(cfg, datetime.now().astimezone())
+    core.save(core.CONFIG, cfg)
+    print("Kernel automation preferences saved; SMTP settings preserved.")
+    if (update or reboot) and not enabled:
+        print("Warning: future automatic kernel installs and reboots are disabled without a maintenance window.")
+
+
+
+def configure_self_update():
+    """Explicit one-time opt-in for an existing configuration, without resetting SMTP."""
+    if os.geteuid():
+        raise core.LKSUError("Root required")
+    cfg = core.config()
+    answer = input("Automatically install verified LKSU application releases? [Y/n]: ").strip().lower()
+    if answer not in {"", "y", "yes", "n", "no"}:
+        raise core.LKSUError("Answer y or n")
+    enabled = answer in {"", "y", "yes"}
+    cfg["automatic_lksu_updates"] = enabled
+    core.save(core.CONFIG, cfg)
+    print("Automatic LKSU application updates: " + ("Enabled" if enabled else "Disabled"))
 
 
 def send_report(cfg, subject, body):
@@ -105,7 +174,8 @@ def send_report(cfg, subject, body):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="AlmaLinux Kernel Security Updater")
-    parser.add_argument("command", choices=("configure", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check", "self-update", "self-update-check", "self-update-scheduled"))
+    parser.add_argument("--json", action="store_true", help="Print the full machine-readable report instead of an operator summary")
+    parser.add_argument("command", choices=("configure", "configure-automation", "configure-self-update", "initialize", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check", "self-update", "self-update-check", "self-update-scheduled"))
     args = parser.parse_args(argv)
     reboot_requested = False
     mail_failure = None
@@ -115,8 +185,17 @@ def main(argv=None):
         if args.command == "configure":
             setup()
             return 0
+        if args.command == "configure-self-update":
+            configure_self_update()
+            return 0
+        if args.command == "configure-automation":
+            configure_automation()
+            return 0
         cfg = core.config()
-        if args.command == "self-update-check":
+        if args.command == "initialize":
+            with core.kernel_operation_lock():
+                result, reboot_requested = core.initial_run(cfg)
+        elif args.command == "self-update-check":
             result = self_update.check()
         elif args.command in {"self-update", "self-update-scheduled"}:
             result = self_update.update(automatic=args.command == "self-update-scheduled",
@@ -132,7 +211,8 @@ def main(argv=None):
         elif args.command == "apply":
             if os.geteuid():
                 raise core.LKSUError("Root required")
-            result = core.apply(cfg["policy"])
+            with core.kernel_operation_lock():
+                result = core.apply(cfg["policy"])
         elif args.command == "scheduled":
             result = core.check()
         elif args.command == "maintenance":
@@ -140,24 +220,30 @@ def main(argv=None):
                 # Collect a read-only assessment even when installation is deferred.
                 result = {"status": "outside-maintenance-window", **core.check()}
             else:
-                result, reboot_requested = core.maintenance(cfg)
+                with core.kernel_operation_lock():
+                    result, reboot_requested = core.maintenance(cfg)
         elif args.command == "stage-reboot":
             if not in_maintenance_window(cfg):
                 raise core.LKSUError("Outside configured maintenance window")
-            if cfg.get("automatic_reboot"):
-                core.auto_reboot_preflight(cfg)
-            result = core.stage_trial_boot()
+            with core.kernel_operation_lock():
+                if cfg.get("automatic_reboot"):
+                    core.auto_reboot_preflight(cfg)
+                result = core.stage_trial_boot()
             if cfg.get("automatic_reboot"):
                 reboot_requested = True
         elif args.command == "verify":
-            result = core.verify(cfg)
+            with core.kernel_operation_lock():
+                result = core.verify(cfg)
         else:
             if os.geteuid():
                 raise core.LKSUError("Root required")
-            result = {"old_default": core.select_old(), "rebooted": False}
-        output = json.dumps(result, indent=2)
-        print(output)
-        routine_reports = args.command in {"scheduled", "apply", "maintenance", "stage-reboot", "verify", "self-update", "self-update-scheduled"}
+            with core.kernel_operation_lock():
+                result = {"old_default": core.select_old(), "rebooted": False}
+        if args.json:
+            print(json.dumps(result, indent=2))
+        else:
+            print(format_console_report(cfg, args.command, result))
+        routine_reports = args.command in {"initialize", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "self-update", "self-update-scheduled"}
         if args.command == "self-update-scheduled" and result.get("status") in {
             "self-update-disabled", "self-update-no-release", "self-update-current"
         }:
@@ -181,7 +267,7 @@ def main(argv=None):
         print(f"LKSU error: {exc}", file=sys.stderr)
         # Report failed scheduled actions too, without retrying a failed SMTP send.
         if cfg is not None and not report_attempted and cfg.get("notifications", True) and args.command in {
-            "scheduled", "apply", "maintenance", "stage-reboot", "verify", "security-check", "self-update", "self-update-scheduled"
+            "initialize", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "security-check", "self-update", "self-update-scheduled"
         }:
             try:
                 subject, body = build_email_report(cfg, args.command, {"status": "error", "error": str(exc)})
