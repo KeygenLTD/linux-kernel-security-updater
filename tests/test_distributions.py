@@ -32,6 +32,39 @@ class DistributionTests(unittest.TestCase):
                 with self.assertRaises(core.LKSUError):
                     require_automatic_kernel_backend(host)
 
+    def test_expanded_families_are_recognized_without_unattended_updates(self):
+        cases = {
+            "cloudlinux": ("cloudlinux", "dnf/rpm"),
+            "cloudlinuxos": ("cloudlinux", "dnf/rpm"),
+            "ol": ("rhel", "dnf/rpm"),
+            "amzn": ("rhel", "dnf/rpm"),
+            "linuxmint": ("debian", "apt/dpkg"),
+            "kali": ("debian", "apt/dpkg"),
+            "opensuse-tumbleweed": ("suse", "zypper/rpm"),
+            "sles": ("suse", "zypper/rpm"),
+            "alpine": ("alpine", "apk"),
+            "gentoo": ("gentoo", "emerge"),
+            "nixos": ("nix", "nix"),
+            "void": ("void", "xbps"),
+            "endeavouros": ("arch", "pacman"),
+        }
+        for identifier, (family, package_manager) in cases.items():
+            with self.subTest(identifier=identifier):
+                distro = self.identify("ID=" + identifier + "\\nVERSION_ID=9\\n")
+                self.assertEqual(distro.family, family)
+                self.assertEqual(distro.package_manager, package_manager)
+                self.assertEqual(distro.reboot_capability, "blocked")
+                with self.assertRaises(core.LKSUError):
+                    require_automatic_kernel_backend(distro)
+
+    def test_cloudlinux_9_never_inherits_almalinux_reboot_permission(self):
+        for major in ("8", "9", "10"):
+            with self.subTest(major=major):
+                distro = self.identify("ID=cloudlinux\\nID_LIKE=\"rhel fedora\"\\nVERSION_ID=" + major + "\\n")
+                self.assertEqual(distro.update_capability, "not-validated")
+                with self.assertRaises(core.LKSUError):
+                    require_automatic_kernel_backend(distro)
+
     def test_unknown_linux_distribution_fails_closed(self):
         host = self.identify("ID=unknownos\nVERSION_ID=1\n")
         self.assertEqual(host.family, "unknown")
