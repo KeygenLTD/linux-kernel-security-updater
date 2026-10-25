@@ -183,12 +183,14 @@ def build_email_report(cfg, command, result, *, timestamp=None, hostname=None, o
             lines.append("- ... {} additional packages".format(len(updates) - 30))
     if advisory_items:
         lines.extend(["", "Security advisories", "-------------------"])
-        for item in advisory_items[:20]:
+        for item in advisory_items[:5]:
             cves = item.get("cves") or []
-            cve_text = ", ".join(str(v) for v in cves[:10]) if isinstance(cves, list) and cves else "CVEs not listed"
+            cve_text = ", ".join(str(v) for v in cves[:3]) if isinstance(cves, list) and cves else "CVEs not listed"
+            if isinstance(cves, list) and len(cves) > 3:
+                cve_text += " (+{} more CVEs)".format(len(cves) - 3)
             lines.append("- {} | {} | {}".format(item.get("id"), item.get("severity", "Unknown"), cve_text))
-        if len(advisory_items) > 20:
-            lines.append("- ... {} additional advisories".format(len(advisory_items) - 20))
+        if len(advisory_items) > 5:
+            lines.append("- ... {} additional advisories; use lksu check --json for details".format(len(advisory_items) - 5))
     if isinstance(advisories, list):
         for item in advisories:
             if isinstance(item, dict) and item.get("warning"):
@@ -211,3 +213,52 @@ def build_email_report(cfg, command, result, *, timestamp=None, hostname=None, o
     lines.extend(["", "Important: A preserved kernel is not a VM snapshot or a proven rollback. Confirm provider-console recovery before reboot.", ""])
     subject = "LKSU [{}] {} | {}".format(level, hostname, command)
     return subject, "\n".join(lines)
+
+
+def format_console_report(cfg, command, result):
+    """Human-readable, bounded English output; --json retains complete details."""
+    level, summary, action = _outcome(command, result)
+    def display(value):
+        return str(value) if value is not None else "Not checked"
+
+    lines = [
+        "",
+        "LKSU | Linux Kernel Security Updater",
+        "-" * 42,
+        "Host:             " + os.uname().nodename,
+        "Operation:        " + command,
+        "Status:           " + level,
+        "Summary:          " + summary,
+    ]
+    running = result.get("running")
+    if running:
+        lines.append("Running kernel:   " + str(running))
+    target = result.get("reboot_target") or result.get("new_default") or result.get("default")
+    if target:
+        lines.append("Next boot kernel: " + str(target).removeprefix("/boot/vmlinuz-"))
+    required = result.get("reboot_required")
+    if required is not None:
+        lines.append("Reboot required:  " + ("Yes" if required else "No"))
+    upgrades = result.get("updates")
+    if isinstance(upgrades, list):
+        lines.append("Package upgrades: " + str(len(upgrades)) + " available")
+    advisories = result.get("security_advisories")
+    if isinstance(advisories, list):
+        count = sum(bool(isinstance(a, dict) and a.get("id")) for a in advisories)
+        lines.append("Advisories:       " + str(count) + " listed (not proof of unpatched CVEs)")
+    if result.get("status", "").startswith("self-update"):
+        if result.get("installed_version"):
+            lines.append("LKSU installed:   " + display(result.get("installed_version")))
+        if result.get("release_version"):
+            lines.append("Latest release:   " + display(result.get("release_version")))
+    if command in {"check", "scheduled", "maintenance", "apply", "stage-reboot"}:
+        lines.append("Kernel updates:   " + ("Enabled" if cfg.get("automatic_updates") else "Disabled"))
+        lines.append("Automatic reboot: " + ("Enabled (subject to safety checks)" if cfg.get("automatic_reboot") else "Disabled"))
+        lines.append("Maintenance:      " + _window_description(cfg))
+    lines.append("LKSU self-update: " + ("Enabled" if cfg.get("automatic_lksu_updates") else "Disabled"))
+    if result.get("error"):
+        lines.append("Error:            " + str(result["error"])[:500])
+    lines.append("Next action:      " + action)
+    lines.append("Full technical details: lksu " + command + " --json")
+    lines.append("")
+    return "\n".join(lines)
