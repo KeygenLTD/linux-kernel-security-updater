@@ -108,9 +108,9 @@ def grub_menu_entry(release, config=pathlib.Path("/boot/grub/grub.cfg")):
         match = re.match(r"^(menuentry|submenu) ['\"]([^'\"]+)['\"]", stripped)
         if match:
             kind, label = match.groups()
-            identifier = re.search(r"(?:--id|\\$menuentry_id_option)\\s+['\"]?([A-Za-z0-9._+~-]+)", stripped)
+            identifier = re.search(r"(?:--id|\$menuentry_id_option)\s+['\"]?([A-Za-z0-9._+~-]+)", stripped)
             stack.append((kind, identifier.group(1) if identifier else label, depth))
-        if re.search(r"(?:^|\\s)(?:linux|linuxefi)\\s+\\S*vmlinuz-" + re.escape(release) + r"(?:\\s|$)", stripped):
+        if re.search(r"(?:^|\s)(?:linux|linuxefi)\s+\S*vmlinuz-" + re.escape(release) + r"(?:\s|$)", stripped):
             path = ">".join(item[1] for item in stack)
             if not path:
                 raise DebianKernelError("Kernel found outside GRUB menu")
