@@ -37,7 +37,7 @@ jobs:
           if os.environ["GITHUB_REF"].startswith("refs/tags/") and os.environ["GITHUB_REF_NAME"]!=tag:
               raise SystemExit("Tag/version mismatch; refusing release")
           with open(os.environ["GITHUB_OUTPUT"],"a") as output:
-              output.write("tag="+tag+"\\n")
+              output.write("tag="+tag+"\n")
           PY
       - name: Build a versioned wheel
         run: python -m build --wheel --outdir dist
