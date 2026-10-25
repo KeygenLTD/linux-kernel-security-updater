@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.21 — Actual Linux container image detection tests
+
+- CI validates distribution detection and fail-closed update/reboot gates against Ubuntu 24.04, Debian 12, Rocky 9, Fedora, Alpine and Arch Linux official container images.
+- This is **not** a kernel installation/reboot/rollback test. Actual kernel update support remains AlmaLinux 8/9/10 only; CloudLinux requires dedicated LVE/kernel test hosts.
+
+
 ## v0.3.20 — Extended Linux distribution identification (v1 groundwork)
 
 - Add read-only CloudLinux, SUSE, Alpine, Gentoo, NixOS, Void and additional RHEL/Debian/Arch derivative identification.
