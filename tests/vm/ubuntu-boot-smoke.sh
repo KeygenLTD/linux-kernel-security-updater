@@ -61,6 +61,18 @@ echo "QEMU $EXPECTED_DISTRO guest boot and running kernel verification passed."
 # Compare guest boot IDs before and after a genuine system reboot.
 ssh_opts=(-i "$workdir/id_ed25519" -o StrictHostKeyChecking=no
   -o UserKnownHostsFile=/dev/null -o ConnectTimeout=3 -o BatchMode=yes -p 22222)
+old_kernel="$(ssh "${ssh_opts[@]}" lksutest@127.0.0.1 'uname -r')"
+if [[ "${KERNEL_UPGRADE_TEST:-0}" == 1 ]]; then
+  if [[ "$EXPECTED_DISTRO" != debian ]]; then
+    echo "Kernel upgrade VM experiment is restricted to Debian guests." >&2
+    exit 1
+  fi
+  echo "Installing official Debian kernel meta-package in disposable guest (no host changes)."
+  ssh "${ssh_opts[@]}" lksutest@127.0.0.1 \
+    'sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y linux-image-amd64' \
+    > guest-package-install.log 2>&1 || { tail -60 guest-package-install.log; exit 1; }
+  echo "Debian kernel package transaction succeeded; rebooting guest."
+fi
 old_boot_id="$(ssh "${ssh_opts[@]}" lksutest@127.0.0.1 'cat /proc/sys/kernel/random/boot_id')"
 [[ "$old_boot_id" =~ ^[a-f0-9-]{36}$ ]] || { echo "Cannot read guest boot identifier" >&2; exit 1; }
 ssh "${ssh_opts[@]}" lksutest@127.0.0.1 'sudo systemctl reboot' >/dev/null 2>&1 || true
@@ -84,5 +96,16 @@ if [[ "$rebooted" != 1 ]]; then
   exit 1
 fi
 echo "Verified $EXPECTED_DISTRO guest reboot: boot ID changed and guest kernel is running."
-echo "No kernel package installation, kernel selection or rollback occurred."
+if [[ "${KERNEL_UPGRADE_TEST:-0}" == 1 ]]; then
+  new_kernel="$(ssh "${ssh_opts[@]}" lksutest@127.0.0.1 'uname -r')"
+  echo "Kernel before package transaction: $old_kernel"
+  echo "Kernel after reboot: $new_kernel"
+  if [[ "$new_kernel" == "$old_kernel" ]]; then
+    echo "NO KERNEL VERSION CHANGE: official image may already have latest vendor kernel; trial is inconclusive." >&2
+    exit 1
+  fi
+  echo "Verified Debian package install, reboot and changed running kernel."
+else
+  echo "No kernel package installation, kernel selection or rollback occurred."
+fi
 
