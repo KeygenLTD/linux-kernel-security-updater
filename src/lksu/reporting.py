@@ -62,6 +62,10 @@ def _window_description(cfg):
 def _outcome(command, result):
     status = result.get("status")
     updates = result.get("updates")
+    if status == "reboot-blocked":
+        return ("REBOOT BLOCKED",
+                "A new kernel is installed or ready for boot, but unattended reboot was blocked by safety checks.",
+                "Yes - " + str(result.get("reboot_block_reason", "inspect recovery preflight"))[:240])
     if status == "initial-run-completed":
         return "ALREADY INITIALIZED", "The first kernel installation pass was already completed earlier; no installation or reboot repeated.", "Routine monitoring and maintenance timers continue."
     if status == "initial-check-only":
@@ -203,6 +207,8 @@ def build_email_report(cfg, command, result, *, timestamp=None, hostname=None, o
         lines.extend(["", "LKSU application", "----------------",
             "Installed application version: " + str(result.get("installed_version", "Not checked")),
             "Available release: " + str(result.get("release_version", "Not checked"))])
+    if result.get("reboot_block_reason"):
+        lines.extend(["", "Reboot safety block", "-------------------", str(result["reboot_block_reason"])[:600]])
     if result.get("error"):
         lines.extend(["", "Failure details", "---------------", str(result["error"])[:1000]])
     if "services" in result and isinstance(result["services"], dict):
@@ -260,6 +266,8 @@ def format_console_report(cfg, command, result):
         lines.append("Automatic reboot: " + ("Enabled (subject to safety checks)" if cfg.get("automatic_reboot") else "Disabled"))
         lines.append("Maintenance:      " + _window_description(cfg))
     lines.append("LKSU self-update: " + ("Enabled" if cfg.get("automatic_lksu_updates") else "Disabled"))
+    if result.get("reboot_block_reason"):
+        lines.append("Reboot blocked:   " + str(result["reboot_block_reason"])[:500])
     if result.get("error"):
         lines.append("Error:            " + str(result["error"])[:500])
     lines.append("Next action:      " + action)
