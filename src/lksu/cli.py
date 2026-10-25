@@ -28,13 +28,41 @@ def yes_no(prompt, default):
 
 
 def detect_active_host_services():
-    """Suggest only verified-active CyberPanel services; do not presume availability."""
-    found = []
-    for service in ("lsws", "mariadb", "lscpd"):
-        status = core.run("systemctl", "is-active", "--quiet", service, check=False)
-        if status.returncode == 0:
-            found.append(service)
-    return found
+    """Discover running, boot-enabled application services without panel assumptions.
+
+    This is an onboarding suggestion, not proof of application health.
+    Never auto-select base OS services just to satisfy a reboot gate.
+    """
+    units = core.run(
+        "systemctl", "list-units", "--type=service", "--state=running",
+        "--no-legend", "--plain", "--no-pager",
+    ).stdout
+    os_services = {
+        "auditd", "chronyd", "crond", "dbus", "dbus-broker",
+        "firewalld", "irqbalance", "network", "networkmanager",
+        "polkit", "qemu-guest-agent", "rsyslog", "sshd", "sssd",
+        "tuned", "smartd", "rngd", "getty", "systemd-logind",
+        "unattended-upgrades", "upower",
+    }
+    candidates = []
+    for line in units.splitlines():
+        fields = line.split()
+        if not fields:
+            continue
+        unit = fields[0].lstrip("●")
+        if not re.fullmatch(r"[A-Za-z0-9_.@-]+\.service", unit):
+            continue
+        name = unit[:-len(".service")]
+        if (name.lower() in os_services
+                or name.startswith(("systemd-", "lksu-", "user@", "getty@", "serial-getty@", "dbus-"))):
+            continue
+        candidates.append((unit, name))
+    enabled_services = []
+    for unit, name in sorted(set(candidates))[:80]:
+        result = core.run("systemctl", "is-enabled", unit, check=False)
+        if result.returncode == 0 and result.stdout.strip() in {"enabled", "enabled-runtime"}:
+            enabled_services.append(name)
+    return enabled_services[:16]
 
 
 def validate_reboot_health_checks(services, health_urls):
@@ -85,7 +113,7 @@ def setup():
         raise core.LKSUError("Automatic kernel installation requires security-only or all-stable")
     if policy not in {"check-only", "security-only", "all-stable"}:
         raise core.LKSUError("Invalid install policy")
-    services = input("Services to verify after reboot (comma separated, optional): ").strip()
+    services = input("Services to verify after reboot (comma-separated; Enter to detect running apps): ").strip()
     parsed = [x.strip() for x in services.split(",") if x.strip()]
     if any(not re.fullmatch(r"[A-Za-z0-9_.@-]+", x) for x in parsed):
         raise core.LKSUError("Invalid service name")
@@ -94,7 +122,7 @@ def setup():
     if automatic_reboot and not parsed and not parsed_urls:
         parsed = detect_active_host_services()
         if parsed:
-            print("Selected running server health checks: " + ", ".join(parsed))
+            print("Selected running application health checks: " + ", ".join(parsed))
     if automatic_reboot:
         validate_reboot_health_checks(parsed, parsed_urls)
     recovery_ready = False
@@ -138,17 +166,25 @@ def configure_automation():
             raise core.LKSUError("Invalid install policy")
         cfg["policy"] = policy
     if reboot:
-        if not cfg.get("services") and not cfg.get("health_urls"):
-            detected = detect_active_host_services()
-            choices = ", ".join(detected) if detected else "none"
-            print("Detected running CyberPanel services: " + choices)
-            names = input("Services to check before and after reboot (comma separated, Enter for detected): ").strip()
-            parsed = [x.strip() for x in names.split(",") if x.strip()] if names else detected
-            if any(not re.fullmatch(r"[A-Za-z0-9_.@-]+", x) for x in parsed):
-                raise core.LKSUError("Invalid service name")
-            cfg["services"] = parsed
-            if parsed:
-                print("Configured reboot health checks: " + ", ".join(parsed))
+        current_services = list(cfg.get("services") or [])
+        if current_services:
+            print("Current reboot health checks: " + ", ".join(current_services))
+            defaults = current_services
+        else:
+            defaults = detect_active_host_services()
+            print("Detected running application services: " + (", ".join(defaults) if defaults else "none"))
+        names = input(
+            "Services to check before and after reboot (comma separated, Enter to keep suggestions; 'none' for URL-only): "
+        ).strip()
+        parsed = (
+            [] if names.lower() == "none" else
+            [x.strip() for x in names.split(",") if x.strip()] if names else defaults
+        )
+        if any(not re.fullmatch(r"[A-Za-z0-9_.@-]+", x) for x in parsed):
+            raise core.LKSUError("Invalid service name")
+        cfg["services"] = parsed
+        if parsed:
+            print("Configured reboot health checks: " + ", ".join(parsed))
         validate_reboot_health_checks(cfg.get("services"), cfg.get("health_urls"))
         cfg["recovery_ready"] = yes_no(
             "Have you verified a current external snapshot AND provider console recovery?",
