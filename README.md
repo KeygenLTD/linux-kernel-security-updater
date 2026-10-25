@@ -2,9 +2,27 @@
 
 ![LKSU kernel update, verification and fallback illustration](docs/assets/lksu-hero.png)
 
-> **Status: v0.3.18 early preview.** CI unit tests target Python 3.9, 3.11 and 3.13. One AlmaLinux 9.8 VPS successfully completed a kernel RPM update, automatic trial reboot and post-boot service verification with an earlier LKSU release. That does **not** validate v0.3.18 on a production host, all AlmaLinux 8/9/10 BIOS/UEFI/recovery variants, or automatic kernel cleanup. Confirm an external snapshot, provider console and service checks before unattended reboot.
+> **Status: v0.3.19 early preview.** CI unit tests target Python 3.9, 3.11 and 3.13. One AlmaLinux 9.8 VPS successfully completed a kernel RPM update, automatic trial reboot and post-boot service verification with an earlier LKSU release. That does **not** validate v0.3.18 on a production host, all AlmaLinux 8/9/10 BIOS/UEFI/recovery variants, or automatic kernel cleanup. Confirm an external snapshot, provider console and service checks before unattended reboot.
 
 Early production-oriented release for **AlmaLinux 8, 9 and 10**. LKSU uses the distribution's enabled DNF repositories. It does not enable testing repositories, select a CVE-specific build, or download arbitrary RPMs. It requests automatic reboot only after opt-in and safety checks.
+
+## Multi-distribution roadmap (in development)
+
+Run `lksu compatibility --json` to inspect the current Linux distribution and the
+available kernel/update/boot backend **without making system changes**.
+
+| Distribution family | Detection | Unattended kernel update | Reboot and rollback |
+| --- | --- | --- | --- |
+| AlmaLinux 8/9/10 | Yes | Existing implementation | Existing guarded trial boot |
+| Rocky Linux / RHEL / CentOS Stream / Fedora | Yes | Not yet validated; blocked | Blocked |
+| Ubuntu / Debian | Yes | APT adapter not yet implemented; blocked | Blocked |
+| Arch Linux | Yes | Pacman adapter not yet implemented; blocked | Blocked |
+
+This capability inspection does **not** imply those platforms are supported.
+We will only unlock automatic updates after distro-specific kernel packaging,
+transaction, bootloader, snapshot/recovery and post-boot tests pass. A distro
+that cannot be safely identified or recovered always fails closed.
+No SSH access to production servers was used to develop this feature.
 
 ## Safety model
 
@@ -35,10 +53,10 @@ systemctl list-timers lksu.timer lksu-maintenance.timer
 
 ## One-command setup (recommended)
 
-For the pinned **v0.3.18 release** on AlmaLinux 8/9/10 (only after the GitHub Release wheel has been published and verified):
+For the pinned **v0.3.19 release** on AlmaLinux 8/9/10 (only after the GitHub Release wheel has been published and verified):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/KeygenLTD/linux-kernel-security-updater/v0.3.18/bootstrap.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/KeygenLTD/linux-kernel-security-updater/v0.3.19/bootstrap.sh | sudo bash
 ```
 
 This installs LKSU, asks for the report email and provider settings, configures timers, and immediately attempts an eligible kernel installation if automatic updates are selected. A trial reboot can occur when explicitly enabled and after every recovery and health gate passes.

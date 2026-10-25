@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-RELEASE="v0.3.18"
+RELEASE="v0.3.19"
 REPO="KeygenLTD/linux-kernel-security-updater"
 ARCHIVE="https://github.com/${REPO}/archive/refs/tags/${RELEASE}.tar.gz"
 [[ "${EUID}" -eq 0 ]] || { echo "Run with sudo" >&2; exit 1; }

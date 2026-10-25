@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.19 — Multi-distribution detection foundation
+
+- Detect RHEL-family, Debian-family and Arch-family systems via the read-only `lksu compatibility --json` command.
+- Preserve verified AlmaLinux 8/9/10 kernel update and guarded reboot support.
+- **No production support for other distributions yet:** updating and rebooting remain blocked until distro-specific installation/rollback tests are completed.
+- Add regression tests for fail-closed unsupported hosts; no live distribution validation was performed.
+
 ## v0.3.18 — Continuous kernel automation (maintenance-window removal)
 
 - Remove all time-of-day restriction prompts and window evaluation, including the old 03:00/60-minute defaults. Every enabled LKSU kernel timer invocation can assess updates at any hour (15-minute systemd cadence).
