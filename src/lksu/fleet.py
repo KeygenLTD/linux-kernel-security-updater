@@ -3,6 +3,8 @@ import argparse
 import hashlib
 import hmac
 import json
+import ipaddress
+from urllib.parse import urlsplit
 import sqlite3
 import ssl
 import time
@@ -20,9 +22,21 @@ def send_report(config, payload):
     fleet = config.get("fleet") or {}
     if not fleet.get("url"):
         return None
+    endpoint = fleet["url"].rstrip("/")
+    parsed = urlsplit(endpoint)
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise ValueError("Invalid fleet URL: credentials and query parameters are forbidden")
+    try:
+        local_host = parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+    except ValueError as exc:
+        raise ValueError("Invalid fleet URL") from exc
+    if parsed.scheme != "https" and not (parsed.scheme == "http" and local_host):
+        raise ValueError("Fleet telemetry requires HTTPS (HTTP only allowed for loopback)")
     body = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+    if len(body) > 1024 * 1024:
+        raise ValueError("Fleet report exceeds 1 MiB limit")
     timestamp = str(int(time.time()))
-    request = urllib.request.Request(fleet["url"].rstrip("/") + "/api/v1/report", data=body, method="POST", headers={
+    request = urllib.request.Request(endpoint + "/api/v1/report", data=body, method="POST", headers={
         "Content-Type": "application/json", "X-LKSU-Server": fleet["server_id"],
         "X-LKSU-Timestamp": timestamp, "X-LKSU-Signature": signature(fleet["secret"], timestamp, body),
     })
@@ -44,20 +58,34 @@ def handler_factory(db_path, secrets, dashboard_token, stale_after_seconds=900):
         def send_json(self, status, value):
             body = json.dumps(value).encode()
             self.send_response(status); self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
 
         def send_html(self, body):
             data = body.encode(); self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Referrer-Policy", "no-referrer")
             self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'")
             self.send_header("Content-Length", str(len(data))); self.end_headers(); self.wfile.write(data)
 
         def authorized_dashboard(self):
             return hmac.compare_digest(self.headers.get("Authorization", ""), "Bearer " + dashboard_token)
 
+        def setup(self):
+            super().setup()
+            self.connection.settimeout(15)
+
         def do_POST(self):
             if self.path != "/api/v1/report": return self.send_json(404, {"error": "not found"})
-            length = int(self.headers.get("Content-Length", "0"))
+            try:
+                length = int(self.headers.get("Content-Length", ""))
+            except ValueError:
+                return self.send_json(400, {"error": "invalid Content-Length"})
             if length < 2 or length > 1024 * 1024: return self.send_json(413, {"error": "invalid size"})
+            if self.headers.get("Content-Type", "").split(";")[0].strip().lower() != "application/json":
+                return self.send_json(415, {"error": "Content-Type must be application/json"})
             body = self.rfile.read(length); server_id = self.headers.get("X-LKSU-Server", "")
             timestamp = self.headers.get("X-LKSU-Timestamp", ""); supplied = self.headers.get("X-LKSU-Signature", "")
             secret = secrets.get(server_id)
@@ -99,6 +127,7 @@ def main(argv=None):
     if bind not in {"127.0.0.1", "::1", "localhost"} and not (config.get("tls_cert") and config.get("tls_key")):
         raise SystemExit("TLS certificate and key are required for a non-loopback bind")
     server = ThreadingHTTPServer((bind, port), handler_factory(config["database"], config["servers"], config["dashboard_token"], int(config.get("stale_after_seconds", 900))))
+    server.daemon_threads = True
     if config.get("tls_cert"):
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER); context.load_cert_chain(config["tls_cert"], config["tls_key"])
         server.socket = context.wrap_socket(server.socket, server_side=True)
