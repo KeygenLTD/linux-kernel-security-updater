@@ -20,6 +20,19 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install -e .
       - run: python -m unittest discover -s tests -v
+      - name: Verify read-only kernel inventory on actual Ubuntu runner
+        run: |
+          lksu kernel-inventory --json > /tmp/lksu-kernel-inventory.json
+          python - <<'PY'
+          import json
+          with open('/tmp/lksu-kernel-inventory.json') as handle:
+              info = json.load(handle)
+          assert info['distribution'] == 'ubuntu', info
+          assert info['automatic_updates'] == 'blocked', info
+          assert info['automatic_reboot'] == 'blocked', info
+          assert isinstance(info['installed_kernel_packages'], list)
+          print('Verified Ubuntu read-only kernel package inventory')
+          PY
       - run: python -m compileall -q src
       - run: bash -n bootstrap.sh install.sh lksu-status.sh
       - name: Build and validate release wheel
