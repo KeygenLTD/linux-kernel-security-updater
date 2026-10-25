@@ -102,7 +102,7 @@ def setup():
     automatic_lksu_updates = yes_no("Automatically install verified LKSU releases?", True)
     notify_events = yes_no("Email only when updates succeed or fail?", True)
     automatic_reboot = yes_no("Automatically reboot after installing a kernel when recovery checks pass?", True)
-    use_window = yes_no("Use a maintenance window for future kernel installations?", automatic_updates or automatic_reboot)
+    use_window = yes_no("Restrict automatic kernel installations and reboots to a maintenance window?", False)
     start = input("Maintenance start [03:00]: ").strip() or "03:00" if use_window else "03:00"
     duration = int(input("Maintenance duration in minutes [60]: ").strip() or "60") if use_window else 60
     default_policy = "all-stable" if automatic_updates else "check-only"
@@ -151,7 +151,7 @@ def configure_automation():
     update = yes_no("Automatically install kernel updates?", cfg.get("automatic_updates", False))
     reboot = yes_no("Automatically reboot after eligible kernel updates?", cfg.get("automatic_reboot", False))
     window = dict(cfg.get("maintenance_window") or {})
-    enabled = yes_no("Use a maintenance window for future updates?", window.get("enabled", True))
+    enabled = yes_no("Restrict automatic kernel updates and reboots to a maintenance window?", window.get("enabled", True))
     start = window.get("start", "03:00")
     duration = window.get("duration_minutes", 60)
     if enabled:
@@ -198,13 +198,13 @@ def configure_automation():
         from datetime import datetime
         in_maintenance_window(cfg, datetime.now().astimezone())
     core.save(core.CONFIG, cfg)
-    if enabled and (update or reboot):
+    if update or reboot:
         core.run("systemctl", "enable", "--now", "lksu-maintenance.timer")
     else:
         core.run("systemctl", "disable", "--now", "lksu-maintenance.timer")
     print("Kernel automation preferences and maintenance timer saved; SMTP settings preserved.")
     if (update or reboot) and not enabled:
-        print("Warning: future automatic kernel installs and reboots are disabled without a maintenance window.")
+        print("24/7 mode: eligible kernel updates and guarded reboots may run at any 15-minute timer check.")
 
 
 
