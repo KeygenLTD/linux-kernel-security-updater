@@ -64,7 +64,15 @@ class ReportTests(unittest.TestCase):
     def test_rollback_not_assumed_verified(self):
         _, body = render("apply", {"status": "installed-awaiting-manual-reboot", "old_kernel": "6.12.0-previous"})
         self.assertIn("rollback availability NOT verified", body)
-        self.assertIn("recovery boot", body)
+        self.assertIn("Confirm provider-console recovery", body)
+
+
+class MaintenancePolicyTests(unittest.TestCase):
+    def test_disabled_window_never_authorizes_automatic_installation(self):
+        from lksu.policy import in_maintenance_window
+        disabled = {"maintenance_window": {"enabled": False, "start": "02:00", "duration_minutes": 60}}
+        now = datetime(2026, 10, 25, 2, 30, tzinfo=timezone.utc)
+        self.assertFalse(in_maintenance_window(disabled, now=now))
 
 
 class CLIReportTests(unittest.TestCase):
