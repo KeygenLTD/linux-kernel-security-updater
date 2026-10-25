@@ -64,6 +64,16 @@ def _outcome(command, result):
     updates = result.get("updates")
     if status == "error":
         return "ERROR", "Command failed; results must not be treated as a successful check.", "Yes - investigate the error shown below."
+    if status == "self-updated":
+        return "LKSU UPDATED", "LKSU application upgraded to a verified release without reboot.", "Monitor the next scheduled health and kernel checks."
+    if status == "self-update-available":
+        return "LKSU UPDATE AVAILABLE", "A newer LKSU application release is published; no installation was performed.", "Review the published release."
+    if status == "self-update-current":
+        return "LKSU CURRENT", "Installed LKSU application release is current.", "No action indicated."
+    if status == "self-update-no-release":
+        return "NO LKSU RELEASE", "No stable GitHub release is published; LKSU was not modified.", "No action indicated."
+    if status == "self-update-disabled":
+        return "SELF-UPDATE DISABLED", "Automatic LKSU application updates are disabled by configuration.", "No action indicated."
     if status == "no-pending-verification":
         return "NOT REQUIRED", "There is no pending LKSU kernel transition to verify.", "No action indicated."
     if status == "verification-pending":
@@ -156,6 +166,7 @@ def build_email_report(cfg, command, result, *, timestamp=None, hostname=None, o
         "Automatic installation: " + ("Enabled" if cfg.get("automatic_updates", False) else "Disabled"),
         "Automatic reboot: " + ("Enabled" if cfg.get("automatic_reboot", False) else "Disabled"),
         "Recovery readiness approval: " + ("Confirmed by operator" if cfg.get("recovery_ready") else "Not confirmed"),
+        "Automatic LKSU application updates: " + ("Enabled" if cfg.get("automatic_lksu_updates") else "Disabled"),
         "",
         "Scheduling",
         "----------",
@@ -182,6 +193,10 @@ def build_email_report(cfg, command, result, *, timestamp=None, hostname=None, o
         for item in advisories:
             if isinstance(item, dict) and item.get("warning"):
                 lines.append("Advisory warning: " + str(item["warning"])[:300])
+    if result.get("status", "").startswith("self-update"):
+        lines.extend(["", "LKSU application", "----------------",
+            "Installed application version: " + str(result.get("installed_version", "Not checked")),
+            "Available release: " + str(result.get("release_version", "Not checked"))])
     if result.get("error"):
         lines.extend(["", "Failure details", "---------------", str(result["error"])[:1000]])
     if "services" in result and isinstance(result["services"], dict):
