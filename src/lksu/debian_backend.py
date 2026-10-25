@@ -172,6 +172,18 @@ def stage_managed_trial(state_path):
     if release not in images or state["old_kernel"] not in images:
         raise DebianKernelError("Rollback or trial boot image missing")
     entry = grub_menu_entry(release)
+    old_entry = grub_menu_entry(state["old_kernel"])
+    if entry == old_entry:
+        raise DebianKernelError("Trial and rollback entries must differ")
+    # The current kernel must remain the persistent fallback. Never stage a
+    # one-shot boot unless the saved GRUB default resolves to the old kernel.
+    try:
+        default = subprocess.run(["grub-editenv", "list"], capture_output=True,
+                                 text=True, check=False, timeout=30)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise DebianKernelError("Cannot inspect persistent GRUB boot state") from exc
+    if default.returncode or ("saved_entry=" + old_entry) not in default.stdout.splitlines():
+        raise DebianKernelError("Persistent GRUB default is not the preserved old kernel")
     result = stage_one_shot(release)
     state["trial_entry"] = entry
     save(state_path, state)
