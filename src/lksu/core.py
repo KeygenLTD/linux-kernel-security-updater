@@ -6,6 +6,8 @@ import os
 import re
 import shutil
 import subprocess
+import stat
+import tempfile
 import time
 from pathlib import Path
 
@@ -22,8 +24,15 @@ class LKSUError(RuntimeError):
 
 
 def run(*args, check=True, timeout=120):
+    # Prevent a hostile inherited PATH or Python/loader environment from
+    # redirecting commands that this privileged system service executes.
+    env = os.environ.copy()
+    for key in ("PYTHONPATH", "PYTHONHOME", "LD_PRELOAD", "LD_LIBRARY_PATH", "BASH_ENV", "ENV"):
+        env.pop(key, None)
+    env["PATH"] = "/usr/sbin:/usr/bin:/sbin:/bin"
     try:
-        p = subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, timeout=timeout)
+        p = subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                           check=False, timeout=timeout, env=env)
     except subprocess.TimeoutExpired as exc:
         raise LKSUError(f"{args[0]} timed out after {timeout}s; repository or network did not respond") from exc
     if check and p.returncode:
@@ -43,23 +52,40 @@ def os_version():
 
 
 def config():
-    if not CONFIG.exists():
-        raise LKSUError("Run 'lksu configure' first")
-    if CONFIG.stat().st_mode & 0o077:
-        raise LKSUError("Config must be readable only by root (chmod 600)")
+    # Config contains SMTP/fleet credentials and controls unattended root jobs.
+    # Symlinked, world-writable or non-root-owned configuration is not trusted.
+    try:
+        info = CONFIG.lstat()
+    except FileNotFoundError as exc:
+        raise LKSUError("Run 'lksu configure' first") from exc
+    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_uid != 0:
+        raise LKSUError("LKSU configuration must be a root-owned regular file (no links)")
+    if stat.S_IMODE(info.st_mode) != 0o600:
+        raise LKSUError("Config must have mode 0600 (chmod 600)")
     return json.loads(CONFIG.read_text())
 
 
 def save(path, value):
+    if path.parent.is_symlink():
+        raise LKSUError("Refusing to write inside a linked LKSU state directory")
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as f:
-        json.dump(value, f, indent=2)
-        f.write("\n")
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(tmp, path)
+    parent = path.parent.stat()
+    if parent.st_uid != os.geteuid() or parent.st_mode & 0o022:
+        raise LKSUError("LKSU state directory must be owned by the current user and not group/world writable")
+    # Random, exclusively created temporary file prevents predictable .tmp
+    # symlink attacks if filesystem protections are changed accidentally.
+    fd, name = tempfile.mkstemp(prefix="." + path.name + "-", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w") as f:
+            os.fchmod(f.fileno(), 0o600)
+            json.dump(value, f, indent=2)
+            f.write("\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(name, path)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
 
 
 def installed():
