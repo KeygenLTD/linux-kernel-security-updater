@@ -37,18 +37,53 @@ else
   echo "Interactive terminal is required for LKSU configuration." >&2
   exit 1
 fi
-if ! /usr/local/bin/lksu scheduled; then
-  echo "Initial LKSU check or email failed; review the error. Scheduling remains available." >&2
-fi
-
-echo "Initial LKSU check finished. Enabling selected timers."
+echo "Enabling LKSU monitoring and verification services."
 systemctl enable --now lksu.timer
 systemctl enable --now lksu-security-watch.timer
+systemctl enable lksu-verify.service
+systemctl enable --now lksu-self-update.timer
 if python3 - <<'PY'
 import json
 cfg=json.load(open('/etc/lksu/config.json'))
-raise SystemExit(0 if cfg.get('automatic_updates') or cfg.get('automatic_reboot') else 1)
+window=cfg.get('maintenance_window') or {}
+enabled=window.get('enabled', bool(window))
+raise SystemExit(0 if enabled and (cfg.get('automatic_updates') or cfg.get('automatic_reboot')) else 1)
 PY
 then
   systemctl enable --now lksu-maintenance.timer
+else
+  systemctl disable --now lksu-maintenance.timer 2>/dev/null || true
+  echo "Kernel maintenance timer disabled by configuration."
+fi
+
+if python3 - <<'PY'
+import json
+cfg=json.load(open('/etc/lksu/config.json'))
+raise SystemExit(0 if cfg.get('automatic_reboot') and not cfg.get('recovery_ready', False) else 1)
+PY
+then
+  echo "Automatic reboot requires a verified external snapshot, provider console access, and health checks."
+  if [[ -r /dev/tty ]]; then
+    if read -r -p "Configure reboot safeguards now? [y/N]: " reply </dev/tty; then
+      case "${reply,,}" in
+        y|yes) /usr/local/bin/lksu configure-automation </dev/tty >/dev/tty ;;
+      esac
+    fi
+  fi
+fi
+
+# One immediate, real kernel update attempt on first setup. The completion
+# marker prevents reinstalls from unexpectedly bypassing maintenance windows.
+if [[ ! -e /var/lib/lksu/initial-run.json ]]; then
+  echo "First kernel update run: installing eligible RPMs immediately when authorized."
+  if ! /usr/local/bin/lksu initialize; then
+    echo "Initial kernel update or controlled reboot was blocked/failed. Review the details above." >&2
+    exit 1
+  fi
+else
+  echo "Initial kernel update previously attempted successfully; running a read-only status check."
+  if ! /usr/local/bin/lksu scheduled; then
+    echo "Kernel status check failed; inspect logs and email delivery." >&2
+    exit 1
+  fi
 fi
