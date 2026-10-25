@@ -36,6 +36,16 @@ def version_tuple(version):
 
 
 def installed_version():
+    """Inspect the active versioned environment, not a stale system pip install."""
+    active = ROOT / "current"
+    if active.is_symlink():
+        python = active / "bin" / "python"
+        if not python.is_file():
+            raise LKSUError("Active LKSU release is missing its Python executable")
+        release = _cmd(str(python), "-c",
+                       "import importlib.metadata; print(importlib.metadata.version('lksu'))").strip()
+        version_tuple("v" + release)
+        return "v" + release
     return "v" + importlib.metadata.version("lksu")
 
 
