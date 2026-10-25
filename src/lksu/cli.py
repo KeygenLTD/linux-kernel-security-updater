@@ -27,6 +27,24 @@ def yes_no(prompt, default):
     return value in {"y", "yes"}
 
 
+def detect_active_host_services():
+    """Suggest only verified-active CyberPanel services; do not presume availability."""
+    found = []
+    for service in ("lsws", "mariadb", "lscpd"):
+        status = core.run("systemctl", "is-active", "--quiet", service, check=False)
+        if status.returncode == 0:
+            found.append(service)
+    return found
+
+
+def validate_reboot_health_checks(services, health_urls):
+    if not services and not health_urls:
+        raise core.LKSUError(
+            "Automatic reboot requires at least one configured service or URL health check. "
+            "No reboot configuration was saved."
+        )
+
+
 def setup():
     if os.geteuid():
         raise core.LKSUError("Root required")
@@ -73,6 +91,12 @@ def setup():
         raise core.LKSUError("Invalid service name")
     health_urls = input("HTTP/HTTPS health URLs (comma separated, optional): ").strip()
     parsed_urls = [{"url": x.strip(), "status": 200} for x in health_urls.split(",") if x.strip()]
+    if automatic_reboot and not parsed and not parsed_urls:
+        parsed = detect_active_host_services()
+        if parsed:
+            print("Selected running server health checks: " + ", ".join(parsed))
+    if automatic_reboot:
+        validate_reboot_health_checks(parsed, parsed_urls)
     recovery_ready = False
     if automatic_reboot:
         print("Automatic reboot is blocked until recovery readiness is confirmed.")
@@ -115,11 +139,17 @@ def configure_automation():
         cfg["policy"] = policy
     if reboot:
         if not cfg.get("services") and not cfg.get("health_urls"):
-            names = input("Services to check before and after reboot (comma separated): ").strip()
-            parsed = [x.strip() for x in names.split(",") if x.strip()]
+            detected = detect_active_host_services()
+            choices = ", ".join(detected) if detected else "none"
+            print("Detected running CyberPanel services: " + choices)
+            names = input("Services to check before and after reboot (comma separated, Enter for detected): ").strip()
+            parsed = [x.strip() for x in names.split(",") if x.strip()] if names else detected
             if any(not re.fullmatch(r"[A-Za-z0-9_.@-]+", x) for x in parsed):
                 raise core.LKSUError("Invalid service name")
             cfg["services"] = parsed
+            if parsed:
+                print("Configured reboot health checks: " + ", ".join(parsed))
+        validate_reboot_health_checks(cfg.get("services"), cfg.get("health_urls"))
         cfg["recovery_ready"] = yes_no(
             "Have you verified a current external snapshot AND provider console recovery?",
             cfg.get("recovery_ready", False),
@@ -132,7 +162,11 @@ def configure_automation():
         from datetime import datetime
         in_maintenance_window(cfg, datetime.now().astimezone())
     core.save(core.CONFIG, cfg)
-    print("Kernel automation preferences saved; SMTP settings preserved.")
+    if enabled and (update or reboot):
+        core.run("systemctl", "enable", "--now", "lksu-maintenance.timer")
+    else:
+        core.run("systemctl", "disable", "--now", "lksu-maintenance.timer")
+    print("Kernel automation preferences and maintenance timer saved; SMTP settings preserved.")
     if (update or reboot) and not enabled:
         print("Warning: future automatic kernel installs and reboots are disabled without a maintenance window.")
 

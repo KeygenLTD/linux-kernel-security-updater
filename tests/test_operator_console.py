@@ -87,7 +87,10 @@ class ConsoleTests(unittest.TestCase):
     def test_fresh_install_defaults_to_stable_kernel_automation_and_safe_reboot(
         self, prompt, _token, _root, _os, save
     ):
-        prompt.side_effect = lambda label: "operator@example.com" if label == "Report email: " else ""
+        prompt.side_effect = lambda label: (
+            "operator@example.com" if label == "Report email: " else
+            "lsws" if label.startswith("Services to verify after reboot") else ""
+        )
         with contextlib.redirect_stdout(io.StringIO()):
             cli.setup()
         data = save.call_args.args[1]
@@ -99,6 +102,54 @@ class ConsoleTests(unittest.TestCase):
         self.assertFalse(data["recovery_ready"])
         self.assertEqual(data["smtp_password"], "dedicated-token")
 
+
+
+    @patch("lksu.cli.core.run")
+    @patch("lksu.cli.core.save")
+    @patch("lksu.cli.core.config")
+    @patch("lksu.cli.os.geteuid", return_value=0)
+    @patch("builtins.input")
+    def test_automation_offers_active_service_defaults_and_enables_timer(
+        self, prompt, _root, config, save, run
+    ):
+        data = dict(CFG)
+        data["services"] = []
+        data["health_urls"] = []
+        data["recovery_ready"] = True
+        data["automatic_reboot"] = True
+        config.return_value = data
+        def response(message):
+            if message.startswith("Services to check"):
+                return ""  # Accept detected host services.
+            return ""
+        prompt.side_effect = response
+        run.return_value.returncode = 0
+        with contextlib.redirect_stdout(io.StringIO()):
+            cli.configure_automation()
+        self.assertEqual(save.call_args.args[1]["services"], ["lsws", "mariadb", "lscpd"])
+        self.assertTrue(save.call_args.args[1]["automatic_reboot"])
+        self.assertIn(
+            ("systemctl", "enable", "--now", "lksu-maintenance.timer"),
+            [call.args for call in run.call_args_list],
+        )
+
+    @patch("lksu.cli.core.run")
+    @patch("lksu.cli.core.save")
+    @patch("lksu.cli.core.config")
+    @patch("lksu.cli.os.geteuid", return_value=0)
+    @patch("builtins.input", return_value="")
+    def test_automation_refuses_no_health_checks(
+        self, _input, _root, config, save, run
+    ):
+        data = dict(CFG)
+        data["services"] = []
+        data["health_urls"] = []
+        data["automatic_reboot"] = True
+        config.return_value = data
+        run.return_value.returncode = 3
+        with self.assertRaisesRegex(core.LKSUError, "requires at least one"):
+            cli.configure_automation()
+        save.assert_not_called()
 
 
 if __name__ == "__main__":

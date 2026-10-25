@@ -48,6 +48,50 @@ class BootLifecycleTests(unittest.TestCase):
             self.assertTrue(json.loads(state.read_text())["pending"])
             self.assertNotIn(("systemctl", "reboot"), [x.args for x in run.call_args_list])
 
+    def test_system_python_rpm_comparator_handles_venv_missing_module(self):
+        """The LKSU virtualenv has no rpm module; the system interpreter does."""
+        result = type("Result", (), {})
+        def proc(output, returncode=0, stderr=""):
+            p = result()
+            p.stdout = output
+            p.returncode = returncode
+            p.stderr = stderr
+            return p
+        with patch.object(core.Path, "is_file", return_value=True), patch.object(
+            core, "run", side_effect=[
+                proc("(none) 6.12.0 211.68.1.el10_2\n"),
+                proc("(none) 6.12.0 211.51.1.el10_2\n"),
+                proc("1\n"),
+            ]
+        ) as run:
+            self.assertTrue(core._is_newer_kernel(RUNNING, NEWER))
+            comparator = run.call_args.args
+            self.assertEqual(comparator[0], "/usr/bin/python3")
+            self.assertEqual(comparator[1], "-c")
+            self.assertIn("rpm.labelCompare", comparator[2])
+            self.assertEqual(comparator[3:], (
+                "0", "6.12.0", "211.68.1.el10_2",
+                "0", "6.12.0", "211.51.1.el10_2",
+            ))
+
+    def test_comparator_rejects_missing_system_rpm_module(self):
+        proc = type("Result", (), {})
+        def reply(stdout, returncode=0, stderr=""):
+            r = proc()
+            r.stdout = stdout
+            r.returncode = returncode
+            r.stderr = stderr
+            return r
+        with patch.object(core.Path, "is_file", return_value=True), patch.object(
+            core, "run", side_effect=[
+                reply("(none) 6.12.0 211.68.1.el10_2\n"),
+                reply("(none) 6.12.0 211.51.1.el10_2\n"),
+                reply("", returncode=1, stderr="ModuleNotFoundError: No module named 'rpm'"),
+            ]
+        ):
+            with self.assertRaisesRegex(core.LKSUError, "python3-rpm"):
+                core._is_newer_kernel(RUNNING, NEWER)
+
     def test_adoption_fails_closed_when_kernel_is_older(self):
         with patch.object(core, "pending_update", return_value=None), patch.object(
             core, "_is_newer_kernel", return_value=False
