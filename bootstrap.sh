@@ -62,9 +62,9 @@ systemctl enable --now lksu-self-update.timer
 if python3 - <<'PY'
 import json
 cfg=json.load(open('/etc/lksu/config.json'))
-window=cfg.get('maintenance_window') or {}
-enabled=window.get('enabled', bool(window))
-raise SystemExit(0 if enabled and (cfg.get('automatic_updates') or cfg.get('automatic_reboot')) else 1)
+window=cfg.get('maintenance_window')
+configured=isinstance(window, dict) and isinstance(window.get('enabled'), bool)
+raise SystemExit(0 if configured and (cfg.get('automatic_updates') or cfg.get('automatic_reboot')) else 1)
 PY
 then
   systemctl enable --now lksu-maintenance.timer
