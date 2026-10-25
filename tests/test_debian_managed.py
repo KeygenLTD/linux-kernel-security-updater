@@ -1,3 +1,5 @@
+import json
+import subprocess
 import pathlib
 import tempfile
 import unittest
@@ -26,7 +28,13 @@ class ManagedDebianTests(unittest.TestCase):
             failed = backend.verify_managed(state, "6.1-new", False)
             self.assertFalse(failed["healthy"])
             self.assertIn('"pending": true', state.read_text())
-            passed = backend.verify_managed(state, "6.1-new", True)
+            persisted = json.loads(state.read_text())
+            persisted["trial_entry"] = "advanced>new"
+            state.write_text(json.dumps(persisted))
+            with patch.object(backend.subprocess, "run", side_effect=[
+                subprocess.CompletedProcess([], 0),
+                subprocess.CompletedProcess([], 0, stdout="saved_entry=advanced>new\\n")]):
+                passed = backend.verify_managed(state, "6.1-new", True)
             self.assertTrue(passed["healthy"])
             self.assertIn('"pending": false', state.read_text())
 
