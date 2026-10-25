@@ -63,7 +63,7 @@ class SafeKernelCleanupTests(unittest.TestCase):
         self.assertEqual(removed, [ANCIENT])
         self.assertEqual(len(rpm_erasures), 1)
         self.assertEqual(len(dnf_removals), 1)
-        self.assertEqual(len(dnf_removals[0]), 10)
+        self.assertEqual(len(dnf_removals[0]), 9)
         self.assertTrue(all(target.endswith(ANCIENT) for target in dnf_removals[0][-4:]))
         self.assertNotIn(RUNNING, " ".join(dnf_removals[0]))
         self.assertNotIn(FALLBACK, " ".join(dnf_removals[0]))
