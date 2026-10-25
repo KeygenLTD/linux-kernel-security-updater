@@ -37,13 +37,139 @@ systemctl list-timers lksu.timer
 
 ## One-command setup (recommended)
 
-For a pinned GitHub release on AlmaLinux 8/9/10 (after the v0.3.16 release is published):
+For the pinned **published** v0.3.16 release on AlmaLinux 8/9/10 (changes on unreleased branches or main are not included):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/KeygenLTD/linux-kernel-security-updater/v0.3.16/bootstrap.sh | sudo bash
 ```
 
 This installs LKSU, asks for the report email and provider settings, configures timers, and immediately attempts an eligible kernel installation if automatic updates are selected. A trial reboot can occur when explicitly enabled and after every recovery and health gate passes.
+
+## Beginner's email setup: Postmark, SMTP2GO or your own SMTP
+
+**Do I need to install an email server? No.** LKSU only needs access to an **outgoing SMTP service**: a provider that sends alert emails for you. You do not need to install Postfix, open inbound mail ports, or run a mailbox server. The installer asks for an email address and the credentials of that SMTP service.
+
+**Two things to understand before starting:**
+
+- **Report email** = the address where you receive LKSU alerts. **In the current LKSU version, this same address is also used as the From (sender) address.** Therefore, choose an address you can receive mail at **and** are allowed to send from using the provider. For example, `alerts@example.com` must be a real mailbox (or a working forwarding address) under a verified sending domain; do not literally enter the example address.
+- **SMTP username/password** = credentials issued by the sending provider. They are usually **not** your provider website login and should never be your main account password. The setup wizard hides passwords while you type.
+
+**Choose ONE of the following:**
+
+| Provider | Good for | What LKSU needs | Where to start |
+| --- | --- | --- | --- |
+| **Postmark** | Simple transaction/alert messages | Postmark **Server API Token** | [Postmark sign-up](https://account.postmarkapp.com/sign_up) |
+| **SMTP2GO** | Dedicated SMTP username/password; a free option for smaller volumes | SMTP2GO **SMTP User** credentials | [SMTP2GO](https://www.smtp2go.com/) |
+| **Custom SMTP** | An existing mail hosting service or mailbox with SMTP support | SMTP hostname, port, username, app password/password | Your mail provider's SMTP settings page |
+
+The providers' free-plan allowances and approval policies can change. Check [Postmark pricing](https://postmarkapp.com/pricing) and [SMTP2GO pricing](https://www.smtp2go.com/pricing/) before relying on them.
+
+### Option A — Postmark, step by step
+
+1. Visit **[Postmark sign-up](https://account.postmarkapp.com/sign_up)**, create an account and confirm the registration email.
+2. In Postmark, select an existing **Server** or create one called something like `LKSU alerts`. (A Postmark "Server" is a dashboard grouping; it is **not** a VPS you need to set up.)
+3. Verify the email address you intend to put in LKSU's **Report email** field:
+   - Go to **Sender Signatures** and add/verify a **Sender Signature** for that exact address; follow the confirmation message.
+   - Or verify your own sending **Domain**. Postmark will show DKIM/Return-Path DNS records. Copy the values Postmark displays into the DNS manager for your domain (for example Cloudflare), then use Postmark's **Verify** action. **Do not guess DNS values.**
+   - A domain you control is the safest choice. Sending from a personal `@gmail.com` or `@yahoo.com` address through Postmark is generally not an appropriate domain-authentication setup.
+4. Open **Servers → your server → API Tokens** and copy the **Server API Token**. **Do not use the Account API Token**. The Server API Token works as **both the SMTP username and SMTP password** with LKSU's built-in Postmark option.
+5. Ensure SMTP access is enabled for the Postmark server / transactional stream. If sending to an external mailbox is blocked on a new account, review your account approval/trial restrictions in Postmark first.
+6. Run the LKSU installer (shown above), then answer the mail prompts **like this** (replace the examples with real values):
+
+   ```text
+   Report email: alerts@example.com
+   Mail provider [postmark/smtp2go/custom] (default postmark): postmark
+   Postmark Server Token: [paste YOUR server token; input is hidden]
+   ```
+
+LKSU automatically uses **`smtp.postmarkapp.com`**, **port `587`** and **STARTTLS** for this option. You do not need to enter these values separately. Postmark's [SMTP documentation](https://postmarkapp.com/developer/user-guide/send-email-with-smtp) and [token documentation](https://postmarkapp.com/support/article/1008-what-are-the-account-and-server-api-tokens) explain the details.
+
+### Option B — SMTP2GO, step by step
+
+1. Open **[SMTP2GO](https://www.smtp2go.com/)**, create an account and verify the registration email.
+2. In its dashboard go to **Sending → Verified Senders → Sender domains**. Add the domain you own, e.g. `example.com`.
+3. SMTP2GO will show the **DNS CNAME records** needed to authenticate that domain. Open the DNS settings at your domain provider (such as Cloudflare), create the records **exactly as shown**, and return to SMTP2GO to verify the sender domain. See [the official verified-sender guide](https://support.smtp2go.com/hc/en-gb/articles/115004408567-Verified-Senders). Domain verification may take some time.
+4. Go to **Sending → SMTP Users**, choose **Add SMTP user**, and create a dedicated user such as `lksu-alerts` with a strong unique password. This is **not** the password used to log in to the SMTP2GO website. Save the SMTP username and password somewhere secure. See [the official SMTP User guide](https://support.smtp2go.com/hc/en-gb/articles/13645646122777-SMTP-User-Authentication).
+5. In LKSU's installer enter:
+
+   ```text
+   Report email: alerts@example.com
+   Mail provider [postmark/smtp2go/custom] (default postmark): smtp2go
+   SMTP2GO username: [your SMTP2GO SMTP user]
+   SMTP2GO password: [your SMTP user's password; input is hidden]
+   ```
+
+LKSU automatically uses **`mail.smtp2go.com`**, **port `587`**, **STARTTLS**. You do **not** have to create a mail server on the VPS. The SMTP2GO [official connection guide](https://www.smtp2go.com/setup/) lists alternate ports in case outbound port 587 is blocked. Since LKSU's built-in SMTP2GO option fixes port 587, an alternate port requires choosing **custom** instead.
+
+### Option C — Your existing email provider (custom SMTP)
+
+If you already pay for email hosting, ask your mail provider or read its official support page for the **outgoing SMTP server address**, **SMTP port**, **SMTP username** and **password/app password**. This is about **sending** messages; IMAP/POP3 settings for **receiving** messages are not used by LKSU.
+
+Example **only if your provider supports these settings**:
+
+```text
+Report email: alerts@example.com
+Mail provider [postmark/smtp2go/custom] (default postmark): custom
+SMTP host: smtp.your-provider.example
+SMTP port [465]: 587
+SMTP username: alerts@example.com
+SMTP password or app password: [provider-issued password; input is hidden]
+```
+
+For example, a compatible personal Gmail account may use **`smtp.gmail.com`**, **port `587` (STARTTLS)**, the Gmail address as username, and a Google **app password** (when that account is eligible). Enable two-step verification first. Use [Google's official app-password instructions](https://support.google.com/accounts/answer/185833?hl=en); **do not enter your normal Google account password**. Gmail and some organization-managed Google Workspace accounts may not expose app passwords, so a dedicated transactional SMTP provider is generally easier for a production server.
+
+**TLS and ports:** LKSU uses implicit TLS when you enter **465**, and requires **STARTTLS** on other ports such as **587**. Use the port and encryption mode that your provider supports; never disable certificate verification to work around an error.
+
+### What to type in the other LKSU setup prompts
+
+After email setup, LKSU asks separate questions about updating the kernel and restarting the machine. These **can change your server**:
+
+| Setup question | Explanation |
+| --- | --- |
+| `Install available kernel updates on setup and automatically thereafter?` | `y` authorizes real kernel package installation, including during the first setup. |
+| `Automatically install verified LKSU releases?` | `y` allows updates to the LKSU application itself when a newer published release is available. |
+| `Email only when updates succeed or fail?` | `y` means event-based alerts rather than a daily "nothing changed" email. |
+| `Automatically reboot after installing a kernel when recovery checks pass?` | `y` permits real unattended downtime. Prepare a provider snapshot and console access first. |
+| `Restrict automatic kernel installations and reboots to a maintenance window?` | On versions supporting 24/7 mode, `n` removes time restrictions; safety/recovery checks still apply. Published v0.3.16 does **not** have this feature. |
+| `Services to verify after reboot` | Enter real application services (e.g. `mariadb,nginx`) or accept detected active applications. Do not use a made-up name. |
+
+### Check SMTP connectivity and alert delivery
+
+1. **First check the sender in your provider dashboard:** sender/domain is verified, SMTP is enabled, and (if required) sending approval is granted.
+2. **Check the provider's server/port from the VPS** (replace the host if needed):
+
+   ```bash
+   # Postmark on port 587; use mail.smtp2go.com for SMTP2GO.
+   openssl s_client -starttls smtp -connect smtp.postmarkapp.com:587 -servername smtp.postmarkapp.com -brief </dev/null
+   ```
+
+   A successful TLS handshake means the server could reach the provider securely. It does **not** prove that your SMTP credentials are valid or that a message was delivered.
+3. **Check LKSU's read-only status**:
+
+   ```bash
+   sudo lksu scheduled
+   systemctl list-timers --all 'lksu*'
+   ```
+
+   **Important: `lksu scheduled` does not send a test email.** LKSU intentionally only sends alert emails after an actual update, verified boot transition, or reportable failure. Do not deliberately trigger an update or reboot merely to test email.
+4. After a **real** LKSU notification event, check your inbox **and spam/junk folder**, look at the provider's sending/activity logs, and inspect the LKSU journal if sending failed:
+
+   ```bash
+   journalctl -u lksu-maintenance.service -u lksu-verify.service -n 100 --no-pager
+   ```
+
+**Common problems:**
+
+| Symptom | Likely cause and next check |
+| --- | --- |
+| `535` or `Authentication failed` | Incorrect provider SMTP credentials. Postmark needs the **Server** token, not the Account token; SMTP2GO needs an **SMTP User**. |
+| `Sender Signature Not Found` / `sender not verified` | The `Report email` is also the From address; verify that exact sender/domain at the provider. |
+| `Connection timed out` | VPS egress firewall/provider blocks the SMTP port, or hostname/port is wrong. Check provider documentation and outbound connectivity. |
+| `TLS/SSL` error | Wrong port/encryption combination; 587 normally uses STARTTLS, while 465 uses implicit TLS only if supported. |
+| No email after `lksu scheduled` | **Normal:** routine read-only checks do not send email. |
+| Provider accepted email, but nothing in inbox | Inspect provider activity, spam/junk folder, recipient address and provider restrictions. |
+
+**Secrets and safety:** LKSU stores mail settings in root-only `/etc/lksu/config.json` (mode `0600`). This is a local configuration file containing an SMTP secret, **not** a vault. Never paste tokens/passwords into GitHub issues, README examples, chat messages, screenshots or public logs; never commit the config file. Prefer a separate SMTP credential for each server. If credentials leak, revoke/rotate them at the provider. Because the current Report email doubles as From, make sure that address is a permitted sender. If you change SMTP settings after installation, back up and review existing automation settings before re-running the full `sudo lksu configure` wizard, which replaces configuration.
 
 ## Automatic kernel lifecycle and LKSU self-updates
 
@@ -159,7 +285,7 @@ sudo systemctl enable --now lksu-security-watch.timer
 
 Re-run `security-baseline` only after verifying that an intentional LKSU or watched-file change is trusted. Security Watch does not attempt malware removal or general system rollback; use auditd, AIDE, Wazuh, CrowdSec or another dedicated security platform where appropriate.
 
-The interactive setup requests a report address, SMTP host/port, username, password or app password, policy, and health-check service names. Configuration is written to `/etc/lksu/config.json` as mode 0600. Use a dedicated SMTP credential. Port 465 uses implicit TLS; other ports require STARTTLS and certificate verification. Avoid shared administrator account credentials. Test mail delivery with `sudo lksu scheduled` before relying on alerts.
+The interactive setup requests a report address, SMTP host/port, username, password or app password, policy, and health-check service names. Configuration is written to `/etc/lksu/config.json` as mode 0600. Use a dedicated SMTP credential. Port 465 uses implicit TLS; other ports require STARTTLS and certificate verification. Avoid shared administrator account credentials. **Read the [beginner SMTP setup guide](#beginners-email-setup-postmark-smtp2go-or-your-own-smtp) above.** The read-only `sudo lksu scheduled` command does not send test email; validate account approval, verified sender, TLS connectivity and actual event delivery separately.
 
 To change automated installation and reboot without modifying SMTP credentials, run `sudo lksu configure-automation`. This configures `automatic_updates`, `automatic_reboot`, a kernel policy and the maintenance window. The kernel package transaction uses distribution DNF repositories and applies only to kernel package groups. The maintenance timer checks every 15 minutes, and installs/reboots only when an enabled window allows it or when 24/7 mode was explicitly selected; the authorized first-install `initialize` pass is the one-time exception. Once the recovery gate and application health checks are configured, **the user does not need to reboot manually after routine updates**. A preserved bootable kernel is not a full snapshot.
 
