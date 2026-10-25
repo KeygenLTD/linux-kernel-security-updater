@@ -1,12 +1,43 @@
 # Linux Kernel Security Updater (LKSU)
 
+<p align="center">
+  <strong>Linux kernel platform coverage</strong>
+</p>
+<p align="center">
+  <a href="#multi-distribution-roadmap-in-development"><img alt="AlmaLinux — kernel updates" src="https://img.shields.io/badge/AlmaLinux-Kernel_Updates-168B4C?style=flat-square&logo=almalinux&logoColor=white"></a>
+</p>
+<p align="center">
+  <a href="docs/platform-support.md"><img alt="CloudLinux — detection only" src="https://img.shields.io/badge/CloudLinux-Detection_Only-555555?style=flat-square"></a>
+  <a href="docs/platform-support.md"><img alt="Rocky Linux — detection only" src="https://img.shields.io/badge/Rocky_Linux-Detection_Only-555555?style=flat-square&logo=rockylinux&logoColor=white"></a>
+  <a href="docs/platform-support.md"><img alt="Red Hat Enterprise Linux — detection only" src="https://img.shields.io/badge/RHEL-Detection_Only-555555?style=flat-square&logo=redhat&logoColor=white"></a>
+  <a href="docs/platform-support.md"><img alt="CentOS — detection only" src="https://img.shields.io/badge/CentOS-Detection_Only-555555?style=flat-square&logo=centos&logoColor=white"></a>
+  <a href="docs/platform-support.md"><img alt="Oracle Linux — detection only" src="https://img.shields.io/badge/Oracle_Linux-Detection_Only-555555?style=flat-square&logo=oracle&logoColor=white"></a>
+  <a href="docs/platform-support.md"><img alt="Fedora — detection only" src="https://img.shields.io/badge/Fedora-Detection_Only-555555?style=flat-square&logo=fedora&logoColor=white"></a>
+  <a href="docs/platform-support.md"><img alt="Amazon Linux — detection only" src="https://img.shields.io/badge/Amazon_Linux-Detection_Only-555555?style=flat-square&logo=amazonaws&logoColor=white"></a>
+  <a href="docs/platform-support.md"><img alt="Ubuntu — detection only" src="https://img.shields.io/badge/Ubuntu-Detection_Only-555555?style=flat-square&logo=ubuntu&logoColor=white"></a>
+  <a href="docs/platform-support.md"><img alt="Debian — detection only" src="https://img.shields.io/badge/Debian-Detection_Only-555555?style=flat-square&logo=debian&logoColor=white"></a>
+  <a href="docs/platform-support.md"><img alt="Linux Mint — detection only" src="https://img.shields.io/badge/Linux_Mint-Detection_Only-555555?style=flat-square&logo=linuxmint&logoColor=white"></a>
+  <a href="docs/platform-support.md"><img alt="Proxmox — detection only" src="https://img.shields.io/badge/Proxmox-Detection_Only-555555?style=flat-square&logo=proxmox&logoColor=white"></a>
+  <a href="docs/platform-support.md"><img alt="openSUSE — detection only" src="https://img.shields.io/badge/openSUSE-Detection_Only-555555?style=flat-square&logo=opensuse&logoColor=white"></a>
+  <a href="docs/platform-support.md"><img alt="Arch Linux — detection only" src="https://img.shields.io/badge/Arch_Linux-Detection_Only-555555?style=flat-square&logo=archlinux&logoColor=white"></a>
+  <a href="docs/platform-support.md"><img alt="Manjaro — detection only" src="https://img.shields.io/badge/Manjaro-Detection_Only-555555?style=flat-square&logo=manjaro&logoColor=white"></a>
+  <a href="docs/platform-support.md"><img alt="Alpine — detection only" src="https://img.shields.io/badge/Alpine-Detection_Only-555555?style=flat-square&logo=alpinelinux&logoColor=white"></a>
+  <a href="docs/platform-support.md"><img alt="Gentoo — detection only" src="https://img.shields.io/badge/Gentoo-Detection_Only-555555?style=flat-square&logo=gentoo&logoColor=white"></a>
+  <a href="docs/platform-support.md"><img alt="NixOS — detection only" src="https://img.shields.io/badge/NixOS-Detection_Only-555555?style=flat-square&logo=nixos&logoColor=white"></a>
+  <a href="docs/platform-support.md"><img alt="Void Linux — detection only" src="https://img.shields.io/badge/Void_Linux-Detection_Only-555555?style=flat-square&logo=voidlinux&logoColor=white"></a>
+</p>
+
+<p align="center"><small><strong>Kernel Updates</strong> = existing AlmaLinux 8/9/10 implementation. <strong>Detection Only</strong> = recognition only; no kernel installation or automatic reboot on these platforms.</small></p>
+
 ![LKSU kernel update, verification and fallback illustration](docs/assets/lksu-hero.png)
 
-> **Status: v0.3.20 early preview.** CI unit tests target Python 3.9, 3.11 and 3.13. One AlmaLinux 9.8 VPS successfully completed a kernel RPM update, automatic trial reboot and post-boot service verification with an earlier LKSU release. That does **not** validate v0.3.18 on a production host, all AlmaLinux 8/9/10 BIOS/UEFI/recovery variants, or automatic kernel cleanup. Confirm an external snapshot, provider console and service checks before unattended reboot.
+> **Status: v0.3.20 early preview.** CI unit tests target Python 3.9, 3.11 and 3.13. One AlmaLinux 9.8 VPS successfully completed a kernel RPM update, automatic trial reboot and post-boot service verification with an earlier LKSU release. That does **not** validate v0.3.20 on a production host, all AlmaLinux 8/9/10 BIOS/UEFI/recovery variants, or automatic kernel cleanup. Confirm an external snapshot, provider console and service checks before unattended reboot.
 
 Early production-oriented release for **AlmaLinux 8, 9 and 10**. LKSU uses the distribution's enabled DNF repositories. It does not enable testing repositories, select a CVE-specific build, or download arbitrary RPMs. It requests automatic reboot only after opt-in and safety checks.
 
-See [platform coverage and safety gates](docs/platform-support.md) for CloudLinux, Ubuntu, Debian, SUSE, Arch, NixOS and other families. Detection does not authorize kernel changes.\n\n## Multi-distribution roadmap (in development)
+See [platform coverage and safety gates](docs/platform-support.md) for CloudLinux, Ubuntu, Debian, SUSE, Arch, NixOS and other families. Detection does not authorize kernel changes.
+
+## Multi-distribution roadmap (in development)
 
 Run `lksu compatibility --json` to inspect the current Linux distribution and the
 available kernel/update/boot backend **without making system changes**.
