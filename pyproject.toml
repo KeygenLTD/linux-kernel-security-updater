@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lksu"
-version = "0.3.20"
+version = "0.3.21"
 description = "Conservative AlmaLinux kernel update orchestration"
 requires-python = ">=3.9"
 

@@ -46,3 +46,32 @@ jobs:
           "$RUNNER_TEMP/lksu-wheel-test/bin/python" -m pip install --no-deps dist/*.whl
           "$RUNNER_TEMP/lksu-wheel-test/bin/lksu" --help >/dev/null
 
+
+  distro-container-smoke:
+    name: distro detection (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Ubuntu 24.04, image: "ubuntu:24.04", distro: ubuntu }
+          - { name: Debian 12, image: "debian:12", distro: debian }
+          - { name: Rocky Linux 9, image: "rockylinux:9", distro: rocky }
+          - { name: Fedora, image: "fedora:latest", distro: fedora }
+          - { name: Alpine, image: "alpine:3.20", distro: alpine }
+          - { name: Arch Linux, image: "archlinux:latest", distro: arch }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -e .
+      - name: Read actual distro image metadata; no kernel changes
+        env:
+          IMAGE: ${{ matrix.image }}
+          EXPECTED: ${{ matrix.distro }}
+        run: |
+          docker pull "$IMAGE"
+          docker run --rm --entrypoint /bin/sh "$IMAGE" -c 'cat /etc/os-release' > "$RUNNER_TEMP/image-os-release"
+          python tests/smoke_container_os_release.py "$RUNNER_TEMP/image-os-release" "$EXPECTED"
+      - run: echo "Container image metadata does not prove kernel installation, boot, or rollback."
