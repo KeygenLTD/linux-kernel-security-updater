@@ -41,6 +41,16 @@ class ReportTests(unittest.TestCase):
         self.assertIn("Rollback kernel:", body)
         self.assertIn("Next scheduled check: Not determined", body)
 
+    def test_reboot_imminent_is_not_misreported_as_just_staged(self):
+        subject, body = render("initialize", {
+            "status": "trial-boot-staged", "reboot_imminent": True,
+            "running": "6.12.0-old", "new_default": "/boot/vmlinuz-6.12.0-new",
+            "old_kernel": "6.12.0-previous",
+        })
+        self.assertIn("[REBOOT NOTICE]", subject)
+        self.assertIn("SSH sessions will disconnect", body)
+        self.assertIn("post-boot LKSU verification", body)
+
     def test_verified_report_includes_checked_boot_and_default_fields(self):
         subject, body = render("verify", {
             "healthy": True, "running": "6.12.0-current",
