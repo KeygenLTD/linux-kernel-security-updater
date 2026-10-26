@@ -240,14 +240,25 @@ def select_old():
 
 
 @contextmanager
-def kernel_operation_lock():
-    """Prevent concurrent systemd timer and installer kernel modifications."""
+def kernel_operation_lock(wait_seconds=0):
+    """Serialize kernel operations; post-boot verify may wait for a timer to finish.
+
+    Every other operation still fails immediately on contention. A finite wait
+    does not steal the lock or interrupt an in-progress package transaction.
+    """
+    if wait_seconds < 0:
+        raise ValueError("Lock wait must be non-negative")
     KERNEL_LOCK.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+    deadline = time.monotonic() + wait_seconds
     with KERNEL_LOCK.open("a+") as handle:
-        try:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as exc:
-            raise LKSUError("Another LKSU kernel operation is running") from exc
+        while True:
+            try:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError as exc:
+                if time.monotonic() >= deadline:
+                    raise LKSUError("Another LKSU kernel operation is running; verification lock wait expired") from exc
+                time.sleep(min(1.0, max(0.0, deadline - time.monotonic())))
         try:
             yield
         finally:
