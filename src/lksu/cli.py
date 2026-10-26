@@ -302,6 +302,9 @@ def main(argv=None):
                 raise core.LKSUError("Root required")
             with core.kernel_operation_lock():
                 result = {"old_default": core.select_old(), "rebooted": False}
+        if reboot_requested:
+            # The report must reflect the pending restart, not merely GRUB staging.
+            result = {**result, "reboot_imminent": True}
         if args.json:
             print(json.dumps(result, indent=2))
         else:
