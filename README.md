@@ -110,11 +110,13 @@ systemctl list-timers lksu.timer lksu-maintenance.timer
 
 ## One-command setup (recommended)
 
-For the pinned **v0.3.20 release** on AlmaLinux 8/9/10 (only after the GitHub Release wheel has been published and verified):
+For the **stable release** on AlmaLinux 8/9/10, use the permanent install URL:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/KeygenLTD/linux-kernel-security-updater/v0.3.22/bootstrap.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/KeygenLTD/linux-kernel-security-updater/main/bootstrap.sh | sudo bash
 ```
+
+This URL does not change between releases. The bootstrap file on `main` pins an explicitly selected stable tag (currently `v0.3.22`); **it does not install unreviewed development-branch code**. A release maintainer updates that pin only after the new release passes CI and isolated reboot tests. LKSU self-update is a separate opt-in feature with release wheel integrity checks. Review the script before piping it to a root shell.
 
 This installs LKSU, asks for the report email and provider settings, configures timers, and immediately attempts an eligible kernel installation if automatic updates are selected. A trial reboot can occur when explicitly enabled and after every recovery and health gate passes.
 
