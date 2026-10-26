@@ -45,6 +45,24 @@ class KernelTests(unittest.TestCase):
             self.assertFalse(result["healthy"])
             self.assertTrue(json.loads(state.read_text())["pending"])
 
+    def test_successful_verification_reports_confirmed_grub_default(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state = Path(temp) / "state.json"
+            state.write_text(json.dumps({"pending": True, "old_kernel": "old",
+                                         "new_default": "/boot/vmlinuz-new"}))
+            uname = type("U", (), {"release": "new"})()
+            with patch.object(core, "STATE", state), \
+                 patch.object(core.os, "uname", return_value=uname), \
+                 patch("lksu.health.check_all", return_value={"service:mariadb": True}), \
+                 patch.object(core, "default_kernel", return_value="/boot/vmlinuz-new"), \
+                 patch.object(core, "run"):
+                result = core.verify({"services": ["mariadb"]})
+            self.assertTrue(result["healthy"])
+            self.assertEqual(result["default"], "/boot/vmlinuz-new")
+            self.assertEqual(result["boot_status"], "verified-running-kernel")
+            self.assertFalse(result["reboot_required"])
+            self.assertFalse(json.loads(state.read_text())["pending"])
+
     def test_stage_trial_keeps_old_kernel_persistent(self):
         with tempfile.TemporaryDirectory(dir=".") as temp:
             state = Path(temp) / "state.json"
