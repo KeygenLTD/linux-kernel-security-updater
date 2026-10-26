@@ -21,6 +21,17 @@ class BootVerificationOrderingTests(unittest.TestCase):
         verify = (ROOT / "systemd/lksu-verify.service").read_text()
         self.assertIn("ConditionPathExists=/var/lib/lksu/state.json", verify)
 
+    def test_security_watch_prepares_private_state_before_namespace(self):
+        unit = (ROOT / "systemd/lksu-security-watch.service").read_text()
+        self.assertIn("ProtectSystem=strict", unit)
+        self.assertIn("StateDirectory=lksu", unit)
+        self.assertIn("StateDirectoryMode=0700", unit)
+        self.assertIn("ReadWritePaths=/var/lib/lksu", unit)
+        installer = (ROOT / "install.sh").read_text()
+        self.assertIn("install -d -o root -g root -m 0700 /var/lib/lksu", installer)
+        self.assertLess(installer.index("install -d -o root -g root -m 0700 /var/lib/lksu"),
+                        installer.index("systemctl enable --now lksu-self-update.timer"))
+
     def test_default_kernel_operation_does_not_wait_for_busy_lock(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "kernel.lock"
