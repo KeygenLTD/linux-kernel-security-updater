@@ -177,8 +177,14 @@ def verify(cfg):
     report = {"healthy": healthy, "running": running, "services": results, "old_kernel": state["old_kernel"]}
     if healthy:
         run("grubby", "--set-default", state["new_default"])
-        if default_kernel() != state["new_default"]:
+        confirmed_default = default_kernel()
+        if confirmed_default != state["new_default"]:
             raise LKSUError("New kernel health passed but persistent default could not be verified")
+        # These fields are based on an observed running kernel and GRUB default,
+        # not an assumption that future physical rollback will succeed.
+        report.update({"default": confirmed_default, "boot_status": "verified-running-kernel",
+                       "reboot_required": False, "reboot_target": confirmed_default,
+                       "verification_performed": True})
         state["pending"] = False
         state["last_known_good"] = running
         save(STATE, state)
