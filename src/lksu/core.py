@@ -169,6 +169,15 @@ def verify(cfg):
     state = pending_update()
     if state is None:
         return {"status": "no-pending-verification", "healthy": True, "verification_performed": False}
+    if state.get("backend") == "debian-apt-grub":
+        from .debian_backend import verify_managed
+        from .health import check_all
+        results = check_all(cfg)
+        report = verify_managed(STATE, os.uname().release,
+                                bool(results) and all(results.values()))
+        report["services"] = results
+        report["verification_performed"] = True
+        return report
     running = os.uname().release
     event("VERIFY", "Server restarted. Running kernel: " + running + ". Checking configured applications...")
     from .health import check_all
