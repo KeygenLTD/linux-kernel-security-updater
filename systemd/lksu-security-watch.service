@@ -10,5 +10,9 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectHome=yes
 ProtectSystem=strict
+# systemd must create this directory before resolving mount namespace paths.
+# First-install security checks may run before any kernel update creates state.json.
+StateDirectory=lksu
+StateDirectoryMode=0700
 ReadWritePaths=/var/lib/lksu
 
