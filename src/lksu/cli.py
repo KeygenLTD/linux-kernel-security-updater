@@ -295,19 +295,29 @@ def main(argv=None):
             if cfg.get("automatic_reboot"):
                 reboot_requested = True
         elif args.command == "verify":
-            with core.kernel_operation_lock():
+            with core.kernel_operation_lock(wait_seconds=120):
                 result = core.verify(cfg)
         else:
             if os.geteuid():
                 raise core.LKSUError("Root required")
             with core.kernel_operation_lock():
                 result = {"old_default": core.select_old(), "rebooted": False}
+        if reboot_requested:
+            # The report must reflect the pending restart, not merely GRUB staging.
+            result = {**result, "reboot_imminent": True}
         if args.json:
             print(json.dumps(result, indent=2))
         else:
             print(format_console_report(cfg, args.command, result))
         routine_reports = args.command in {"initialize", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "self-update", "self-update-scheduled"}
         if reboot_requested:
+            # Surface the planned downtime before email/report delivery or reboot.
+            target = str(result.get("new_default") or result.get("reboot_target") or "trial kernel").removeprefix("/boot/vmlinuz-")
+            fallback = str(result.get("trial_boot", {}).get("persistent_fallback") or "not confirmed").removeprefix("/boot/vmlinuz-")
+            event("NOTICE", "SERVER RESTART IMMINENT: kernel trial " + target +
+                  "; preserved fallback: " + fallback + ".")
+            event("NOTICE", "Active SSH sessions will disconnect and websites/services may be temporarily unavailable.")
+            event("NOTICE", "Boot recovery is NOT proven by an installed fallback; use the provider console and snapshot if the guest fails to return.")
             event("REBOOT", "Trial kernel prepared; sending event notification and recording fleet report before restart...")
         report_attempted = True
         try:

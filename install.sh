@@ -8,6 +8,8 @@ source /etc/os-release
 if [[ ${ID:-} != almalinux || ! ${VERSION_ID:-} =~ ^(8|9|10)(\.|$) ]]; then echo "AlmaLinux 8, 9 or 10 required" >&2; exit 1; fi
 dnf install -y python3 python3-pip python3-rpm grubby
 python3 -m pip install --prefix=/usr/local .
+# The security watcher may start before a first kernel transaction.
+install -d -o root -g root -m 0700 /var/lib/lksu
 install -D -m 0644 systemd/lksu.service /etc/systemd/system/lksu.service
 install -D -m 0644 systemd/lksu.timer /etc/systemd/system/lksu.timer
 install -D -m 0644 systemd/lksu-maintenance.service /etc/systemd/system/lksu-maintenance.service

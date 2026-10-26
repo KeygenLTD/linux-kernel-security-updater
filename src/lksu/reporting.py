@@ -49,6 +49,10 @@ def _rollback_status(installed_kernels, result):
 def _outcome(command, result):
     status = result.get("status")
     updates = result.get("updates")
+    if result.get("reboot_imminent") is True:
+        return ("REBOOT NOTICE",
+                "A guarded one-time kernel trial reboot is being requested now; SSH sessions will disconnect and hosted services may be temporarily unavailable.",
+                "Monitor provider-console access and the post-boot LKSU verification report. A retained kernel is not proof of a tested rollback.")
     if status == "reboot-blocked":
         return ("REBOOT BLOCKED",
                 "A new kernel is installed or ready for boot, but unattended reboot was blocked by safety checks.",

@@ -1,7 +1,8 @@
 [Unit]
 Description=Install eligible kernel updates and perform guarded kernel reboot
-After=network-online.target
-Wants=network-online.target
+After=network-online.target lksu-verify.service
+Wants=network-online.target lksu-verify.service
+# A pending kernel trial must be verified before a timed maintenance job may run.
 
 [Service]
 Type=oneshot

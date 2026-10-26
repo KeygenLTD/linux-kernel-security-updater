@@ -177,8 +177,14 @@ def verify(cfg):
     report = {"healthy": healthy, "running": running, "services": results, "old_kernel": state["old_kernel"]}
     if healthy:
         run("grubby", "--set-default", state["new_default"])
-        if default_kernel() != state["new_default"]:
+        confirmed_default = default_kernel()
+        if confirmed_default != state["new_default"]:
             raise LKSUError("New kernel health passed but persistent default could not be verified")
+        # These fields are based on an observed running kernel and GRUB default,
+        # not an assumption that future physical rollback will succeed.
+        report.update({"default": confirmed_default, "boot_status": "verified-running-kernel",
+                       "reboot_required": False, "reboot_target": confirmed_default,
+                       "verification_performed": True})
         state["pending"] = False
         state["last_known_good"] = running
         save(STATE, state)
@@ -240,14 +246,25 @@ def select_old():
 
 
 @contextmanager
-def kernel_operation_lock():
-    """Prevent concurrent systemd timer and installer kernel modifications."""
+def kernel_operation_lock(wait_seconds=0):
+    """Serialize kernel operations; post-boot verify may wait for a timer to finish.
+
+    Every other operation still fails immediately on contention. A finite wait
+    does not steal the lock or interrupt an in-progress package transaction.
+    """
+    if wait_seconds < 0:
+        raise ValueError("Lock wait must be non-negative")
     KERNEL_LOCK.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+    deadline = time.monotonic() + wait_seconds
     with KERNEL_LOCK.open("a+") as handle:
-        try:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as exc:
-            raise LKSUError("Another LKSU kernel operation is running") from exc
+        while True:
+            try:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError as exc:
+                if time.monotonic() >= deadline:
+                    raise LKSUError("Another LKSU kernel operation is running; verification lock wait expired") from exc
+                time.sleep(min(1.0, max(0.0, deadline - time.monotonic())))
         try:
             yield
         finally:

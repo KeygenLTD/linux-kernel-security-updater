@@ -4,6 +4,7 @@ RELEASE="v0.3.22"
 REPO="KeygenLTD/linux-kernel-security-updater"
 ARCHIVE="https://github.com/${REPO}/archive/refs/tags/${RELEASE}.tar.gz"
 [[ "${EUID}" -eq 0 ]] || { echo "Run with sudo" >&2; exit 1; }
+echo "LKSU stable bootstrap: installing pinned release ${RELEASE} from ${REPO}."
 tmp="$(mktemp -d /tmp/lksu-bootstrap.XXXXXX)"; trap 'rm -rf "$tmp"' EXIT
 curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 "$ARCHIVE" -o "$tmp/lksu.tgz"
 tar -xzf "$tmp/lksu.tgz" -C "$tmp"

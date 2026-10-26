@@ -41,6 +41,31 @@ class ReportTests(unittest.TestCase):
         self.assertIn("Rollback kernel:", body)
         self.assertIn("Next scheduled check: Not determined", body)
 
+    def test_reboot_imminent_is_not_misreported_as_just_staged(self):
+        subject, body = render("initialize", {
+            "status": "trial-boot-staged", "reboot_imminent": True,
+            "running": "6.12.0-old", "new_default": "/boot/vmlinuz-6.12.0-new",
+            "old_kernel": "6.12.0-previous",
+        })
+        self.assertIn("[REBOOT NOTICE]", subject)
+        self.assertIn("SSH sessions will disconnect", body)
+        self.assertIn("post-boot LKSU verification", body)
+
+    def test_verified_report_includes_checked_boot_and_default_fields(self):
+        subject, body = render("verify", {
+            "healthy": True, "running": "6.12.0-current",
+            "old_kernel": "6.12.0-previous",
+            "default": "/boot/vmlinuz-6.12.0-current",
+            "boot_status": "verified-running-kernel",
+            "reboot_required": False,
+            "reboot_target": "/boot/vmlinuz-6.12.0-current",
+            "services": {"service:mariadb": True},
+        })
+        self.assertIn("[VERIFIED]", subject)
+        self.assertIn("Default kernel: /boot/vmlinuz-6.12.0-current", body)
+        self.assertIn("Boot status: verified-running-kernel", body)
+        self.assertIn("Reboot required: No", body)
+
     def test_unassessed_upgrade_information_is_not_zero(self):
         _, body = render("maintenance", {"status": "reboot-blocked", "running": "6.12.0-current"})
         self.assertIn("Kernel package upgrades: Not checked", body)
