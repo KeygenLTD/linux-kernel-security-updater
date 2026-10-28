@@ -10,7 +10,7 @@ import shutil
 
 from . import core
 
-MIN_BOOT_FREE = 500 * 1024 * 1024
+MIN_BOOT_FREE = 150 * 1024 * 1024
 KERNEL_RPM_NAMES = (
     "kernel", "kernel-core", "kernel-modules",
     "kernel-modules-core", "kernel-modules-extra",
