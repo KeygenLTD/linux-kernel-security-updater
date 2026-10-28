@@ -87,8 +87,8 @@ def preflight(require_boot_space=True):
     if run("findmnt", "-n", "-o", "OPTIONS", "/boot", check=False).returncode == 0:
         pass  # /boot may also be part of /; disk_usage handles either layout.
     boot = shutil.disk_usage("/boot")
-    if require_boot_space and boot.free < 500 * 1024 * 1024:
-        raise LKSUError("Less than 500 MiB free on /boot")
+    if require_boot_space and boot.free < 150 * 1024 * 1024:
+        raise LKSUError("Less than 150 MiB free on /boot")
     if not Path("/boot/grub2/grub.cfg").exists() and not Path("/boot/efi/EFI/almalinux/grub.cfg").exists():
         raise LKSUError("GRUB configuration not found")
     running = os.uname().release
@@ -138,7 +138,7 @@ def apply(policy):
         raise LKSUError("Prior update still awaits post-boot verification")
     old = before["running"]
     removed_old_kernels = []
-    if before.get("boot_free_mib", 500) < 500:
+    if before.get("boot_free_mib", 0) < 150:
         event("CLEANUP", "/boot below the minimum free-space threshold; checking safe obsolete-kernel cleanup.")
         from .kernel_cleanup import reclaim_for_update
         removed_old_kernels = reclaim_for_update()
