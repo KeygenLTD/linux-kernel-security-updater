@@ -135,6 +135,7 @@ def build_email_report(cfg, command, result, *, timestamp=None, hostname=None, o
         "",
         "Server",
         "------",
+        "Server name: " + str(cfg.get("server_name") or hostname),
         "Hostname: " + str(hostname),
         "Operating system: " + str(os_name),
         "Report time: " + timestamp.isoformat(timespec="seconds"),
@@ -208,7 +209,7 @@ def build_email_report(cfg, command, result, *, timestamp=None, hostname=None, o
             if isinstance(alert, dict):
                 lines.append("- {} [{}]: {}".format(alert.get("code", "?"), alert.get("severity", "?"), str(alert.get("message", ""))[:200]))
     lines.extend(["", "Important: A preserved kernel is not a VM snapshot or a proven rollback. Confirm provider-console recovery before reboot.", ""])
-    subject = "LKSU [{}] {} | {}".format(level, hostname, command)
+    subject = "LKSU [{}] {} | {}".format(level, cfg.get("server_name") or hostname, command)
     return subject, "\n".join(lines)
 
 
@@ -222,7 +223,7 @@ def format_console_report(cfg, command, result):
         "",
         "LKSU | Linux Kernel Security Updater",
         "-" * 42,
-        "Host:             " + os.uname().nodename,
+        "Host:             " + str(cfg.get("server_name") or os.uname().nodename),
         "Operation:        " + command,
         "Status:           " + level,
         "Summary:          " + summary,
