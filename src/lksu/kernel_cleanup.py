@@ -83,7 +83,7 @@ def _exact_installed_packages(release):
     return targets
 
 
-def reclaim_for_update():
+def reclaim_for_update(target_free_bytes=MIN_BOOT_FREE):
     """Return removed kernel releases; run under LKSU kernel_operation_lock.
 
     Called only after eligible updates have been identified, and only when
@@ -93,7 +93,7 @@ def reclaim_for_update():
     if os.geteuid():
         raise core.LKSUError("Root required for kernel cleanup")
     removed = []
-    while shutil.disk_usage("/boot").free < MIN_BOOT_FREE:
+    while shutil.disk_usage("/boot").free < target_free_bytes:
         versions = _kernel_core_install_times()
         protected = _protected_releases(versions)
         if len(versions) <= 2:
@@ -127,3 +127,38 @@ def reclaim_for_update():
             raise core.LKSUError("Kernel cleanup unexpectedly removed the fallback kernel")
         removed.append(release)
     return removed
+
+
+def prune_verified_kernels():
+    """Prune obsolete releases only after successful post-boot verification.
+
+    Preserve the running/default kernel, the newest two releases, and any
+    recorded rollback release. Caller must hold the kernel operation lock.
+    """
+    if os.geteuid():
+        raise core.LKSUError("Root required for kernel cleanup")
+    removed = []
+    while True:
+        versions = _kernel_core_install_times()
+        protected = _protected_releases(versions)
+        candidates = sorted(
+            (release for release in versions if release not in protected),
+            key=lambda release: (versions[release], release),
+        )
+        if not candidates:
+            return removed
+        release = candidates[0]
+        packages = _exact_installed_packages(release)
+        core.run("rpm", "-e", "--test", *packages, timeout=120)
+        core.run(
+            "dnf", "-y", "--setopt=clean_requirements_on_remove=False",
+            "--setopt=installonly_limit=0", "remove", *packages, timeout=900,
+        )
+        remaining = set(core.installed())
+        if release in remaining or os.uname().release not in remaining:
+            raise core.LKSUError("Kernel cleanup postcondition failed")
+        if core.default_kernel() != "/boot/vmlinuz-" + os.uname().release:
+            raise core.LKSUError("Kernel cleanup changed GRUB default")
+        if len(remaining) < 2:
+            raise core.LKSUError("Kernel cleanup removed the fallback kernel")
+        removed.append(release)
