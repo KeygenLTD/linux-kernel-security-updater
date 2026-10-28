@@ -183,6 +183,13 @@ def verify(cfg):
         state["last_known_good"] = running
         save(STATE, state)
         event("VERIFY", "Post-boot checks passed; new kernel confirmed and made persistent default.")
+        # Cleanup is best-effort: a cleanup failure must never undo verified boot.
+        try:
+            from .kernel_cleanup import prune_verified_kernels
+            report["cleaned_old_kernels"] = prune_verified_kernels()
+        except (LKSUError, OSError, ValueError) as exc:
+            report["cleanup_warning"] = str(exc)
+            event("CLEANUP", "Verified boot retained; old-kernel cleanup skipped: " + str(exc))
     else:
         event("VERIFY", "Post-boot verification failed. Old kernel remains the persistent fallback; operator review required.")
         report["recommended_action"] = "Investigate failed checks. If rollback is required, confirm provider console access, run 'lksu select-old', verify grubby --default-kernel, then reboot with provider-console recovery available."
