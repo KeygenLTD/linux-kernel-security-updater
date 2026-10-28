@@ -126,7 +126,7 @@ def setup():
     if automatic_reboot:
         print("Automatic reboot is blocked until recovery readiness is confirmed.")
         recovery_ready = yes_no("Have you verified an external snapshot AND provider console recovery?", False)
-    core.save(core.CONFIG, {"email": email, "from_email": email, "smtp_host": host, "smtp_port": port,
+    core.save(core.CONFIG, {"language": "en", "server_name": "", "email": email, "from_email": email, "smtp_host": host, "smtp_port": port,
                             "smtp_user": user, "smtp_password": password, "policy": policy,
                             "services": parsed, "health_urls": parsed_urls,
                             "automatic_updates": automatic_updates, "automatic_lksu_updates": automatic_lksu_updates,
@@ -138,6 +138,28 @@ def setup():
                                                "watched_files": ["/etc/ssh/sshd_config", "/etc/sudoers"]}})
     print(f"Configuration saved; automatic reboot is {'enabled' if automatic_reboot else 'disabled'}.")
     print("Configuration only: kernel installation/reboot has NOT started. Run the bootstrap installer or 'lksu initialize' for the first managed update.")
+
+
+def configure_profile():
+    """Configure locale and display name without modifying SMTP or automation."""
+    if os.geteuid():
+        raise core.LKSUError("Root required")
+    cfg = core.config()
+    print("Language / Dil: [1] Türkçe  [2] English")
+    selected = input("Selection / Seçim [1/2, Enter=keep]: ").strip()
+    if selected not in {"", "1", "2"}:
+        raise core.LKSUError("Invalid language selection / Geçersiz dil seçimi")
+    if selected:
+        cfg["language"] = "tr" if selected == "1" else "en"
+    current = cfg.get("server_name") or ""
+    label = "Sunucu adı" if cfg.get("language") == "tr" else "Server display name"
+    value = input(f"{label} [{current or 'hostname'}]: ").strip()
+    if value:
+        if len(value) > 80 or any(ord(ch) < 32 or ord(ch) == 127 for ch in value):
+            raise core.LKSUError("Invalid server display name")
+        cfg["server_name"] = value
+    core.save(core.CONFIG, cfg)
+    print("Ayarlar kaydedildi." if cfg.get("language") == "tr" else "Profile settings saved.")
 
 
 def configure_automation():
@@ -226,7 +248,7 @@ def send_report(cfg, subject, body):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="AlmaLinux Kernel Security Updater")
     parser.add_argument("--json", action="store_true", help="Print the full machine-readable report instead of an operator summary")
-    parser.add_argument("command", choices=("compatibility", "kernel-inventory", "configure", "configure-automation", "configure-self-update", "initialize", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check", "self-update", "self-update-check", "self-update-scheduled"))
+    parser.add_argument("command", choices=("compatibility", "kernel-inventory", "configure", "configure-automation", "configure-self-update", "configure-profile", "configure-language", "configure-server", "initialize", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check", "self-update", "self-update-check", "self-update-scheduled"))
     args = parser.parse_args(argv)
     reboot_requested = False
     mail_failure = None
@@ -253,6 +275,9 @@ def main(argv=None):
             return 0
         if args.command == "configure":
             setup()
+            return 0
+        if args.command in {"configure-profile", "configure-language", "configure-server"}:
+            configure_profile()
             return 0
         if args.command == "configure-self-update":
             configure_self_update()
