@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from lksu import core
 from lksu.distributions import Distribution
-from lksu.kernel_inventory import apt_inventory, rpm_inventory
+from lksu.kernel_inventory import apt_inventory, rpm_inventory, inventory
 
 
 def distro(identifier, family, manager):
@@ -34,6 +34,20 @@ class KernelInventoryTests(unittest.TestCase):
             result = rpm_inventory(distro("cloudlinux", "cloudlinux", "dnf/rpm"))
         self.assertEqual({p["name"] for p in result["installed_kernel_packages"]}, {"kernel-core", "kernel-uek", "kernel-lve"})
         self.assertEqual(result["automatic_updates"], "blocked")
+
+    def test_almalinux_inventory_is_read_only_and_does_not_claim_automation_blocked(self):
+        distro_info = Distribution("almalinux", "9.8", "rhel", "dnf/rpm", "rpm-kernel",
+                                   "grubby/grub2-reboot", "enabled", "guarded", "test")
+        proc = SimpleNamespace(returncode=0, stdout="kernel-core 5.14.0-687.61.1.el9_8.x86_64\\n", stderr="")
+        with patch("lksu.kernel_inventory.detect", return_value=distro_info), \\
+             patch.object(core, "run", return_value=proc) as runner, \\
+             patch.object(core.os, "uname", return_value=SimpleNamespace(release="5.14.0-687.61.1.el9_8.x86_64")):
+            result = inventory()
+        self.assertEqual(result["installed_kernel_packages"][0]["name"], "kernel-core")
+        self.assertEqual(result["automatic_updates"], "configured-separately")
+        self.assertEqual(result["automatic_reboot"], "configured-separately")
+        runner.assert_called_once()
+        self.assertEqual(runner.call_args.args[:2], ("rpm", "-qa"))
 
     def test_apt_rejects_incompatible_distro(self):
         with self.assertRaises(core.LKSUError):
