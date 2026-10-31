@@ -15,6 +15,14 @@
 
 </div>
 
+
+## 🧭 Quick navigation
+
+[Get started](#getting-started) · [Platforms](#supported-systems) · [FAQ](#frequently-asked-questions) · [Architecture](docs/architecture.md) · [Recovery](docs/recovery.md) · [CVE reporting](docs/cve-security.md)
+
+> [!TIP]
+> Detailed technical guides live in separate documents to keep this page easy to scan.
+
 ## What does LKSU do?
 
 | 🔍 Monitor | 🛠️ Update | 🧪 Verify | ↩️ Recover |
