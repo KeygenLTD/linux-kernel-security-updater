@@ -84,3 +84,48 @@ lksu configure-server-name    # Email/report display name
 No. Checks run every 15 minutes; automatic installation and reboot require explicit opt-ins and safety checks.
 
 </details>
+
+<details>
+<summary>Can I recover from a failed kernel boot?</summary>
+
+LKSU preserves the previous kernel as a fallback during a guarded trial boot. This is not a recovery guarantee: maintain an external snapshot and provider console access.
+
+</details>
+
+<details>
+<summary>Does LKSU support automatic kernel updates on Debian, Ubuntu, Rocky or CloudLinux?</summary>
+
+Not currently. Automatic kernel changes are restricted to validated AlmaLinux versions. See the [support matrix](docs/platform-support.md).
+
+</details>
+
+<details>
+<summary>Does LKSU stop zero-day exploits?</summary>
+
+No. Security Watch reports signals, and Zero-Day Shield is not implemented. A CVE fix requires the vendor patch to be installed, booted and verified.
+
+</details>
+
+<details>
+<summary>How do I change language or server name?</summary>
+
+Use `sudo lksu configure-language` and `sudo lksu configure-server-name`.
+
+</details>
+
+## Update lifecycle
+
+```mermaid
+flowchart LR
+    A["15-minute check"] --> B{"Eligible update?"}
+    B -->|No| C["Report status"]
+    B -->|Yes| D{"Installation enabled?"}
+    D -->|No| C
+    D -->|Yes| E["Install vendor kernel"]
+    E --> F{"Recovery and health checks pass?"}
+    F -->|No| G["Block reboot"]
+    F -->|Yes| H["One-time trial boot"]
+    H --> I{"Post-boot checks pass?"}
+    I -->|Yes| J["Confirm new kernel"]
+    I -->|No| K["Keep previous fallback"]
+```
