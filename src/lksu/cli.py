@@ -149,7 +149,7 @@ def configure_server_name():
     current = cfg.get("display_name") or os.uname().nodename
     label = "Sunucu görünen adı" if cfg.get("report_language") == "tr" else "Server display name"
     name = input(f"{label} [{current}]: ").strip() or current
-    if len(name) > 80 or not re.fullmatch(r"[\\w .()\\-]+", name, flags=re.UNICODE):
+    if len(name) > 80 or not re.fullmatch(r"[\w .()-]+", name, flags=re.UNICODE):
         raise _ui_error("Invalid server name: use up to 80 letters, numbers, spaces, dots, parentheses or hyphens")
     cfg["display_name"] = name
     core.save(core.CONFIG, cfg)
