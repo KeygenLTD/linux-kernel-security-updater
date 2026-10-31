@@ -17,6 +17,14 @@ class TurkishUiTests(unittest.TestCase):
         cli._set_ui_language("tr")
         self.assertEqual(cli._ui("Automatic LKSU application updates: "), "Otomatik LKSU uygulama güncellemeleri: ")
 
+    def test_setup_completion_messages(self):
+        cli._set_ui_language("tr")
+        self.assertIn("Yapılandırma kaydedildi", cli._ui("Configuration saved; automatic reboot is enabled."))
+        self.assertIn("BAŞLAMADI", cli._ui("Configuration only: kernel installation/reboot has NOT started. Run the bootstrap installer or 'lksu initialize' for the first managed update."))
+
+    def test_distribution_reason_translation(self):
+        self.assertIn("doğrulanmadı", cli._COMPAT_REASONS_TR["RPM tools are similar, but kernel/GRUB lifecycle is not verified"])
+
     def test_english_remains_unchanged(self):
         cli._set_ui_language("en")
         self.assertEqual(cli._ui("Automatic LKSU application updates: "), "Automatic LKSU application updates: ")
