@@ -371,8 +371,12 @@ def main(argv=None):
                 labels = {"distribution": "Dağıtım", "version": "Sürüm", "running_kernel": "Çalışan kernel", "installed_kernel_packages": "Kurulu kernel paketleri", "automatic_updates": "Otomatik güncellemeler", "automatic_reboot": "Otomatik yeniden başlatma", "note": "Not"}
                 for key, value in assessment.items():
                     label = labels.get(key, key.replace("_", " ").capitalize()) if _UI_LANG == "tr" else key.replace("_", " ").capitalize()
-                    if _UI_LANG == "tr" and value == "configured-separately":
-                        value = "Ayrı yapılandırılır (lksu check)"
+                    if _UI_LANG == "tr":
+                        value = {"configured-separately": "Ayrı yapılandırılır (lksu check)",
+                                 "blocked": "Engellendi",
+                                 "Read-only RPM inventory; automation policy is reported by lksu check": "Salt okunur RPM envanteri; otomasyon politikası lksu check ile görüntülenir",
+                                 "Read-only RPM inventory; vendor modules and boot path not validated": "Salt okunur RPM envanteri; üretici modülleri ve açılış yolu doğrulanmadı",
+                                 "No inventory backend available; platform detection only": "Envanter altyapısı yok; yalnızca dağıtım algılandı"}.get(value, value) if isinstance(value, str) else value
                     print(f"{label}: {value}")
             return 0
         if args.command == "configure":
