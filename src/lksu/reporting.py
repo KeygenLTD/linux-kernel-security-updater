@@ -138,6 +138,15 @@ def _translate_line(line):
         if key in _TR:
             tail = tail.strip()
             tail = _TR_PHRASES.get(tail, _TR.get(tail, _TR_COMMANDS.get(tail, tail)))
+            if key == "Package upgrades" and tail.endswith(" available"):
+                tail = tail[:-len(" available")] + " mevcut"
+            elif key == "Advisories" and tail.endswith(" listed (not proof of unpatched CVEs)"):
+                tail = tail[:-len(" listed (not proof of unpatched CVEs)")] + " kayıt listelendi (yamalanmamış CVE bulunduğu anlamına gelmez)"
+            else:
+                for english, turkish in _TR_PHRASES.items():
+                    if tail.endswith(" (" + english + ")"):
+                        tail = tail[:-len(english) - 1] + turkish + ")"
+                        break
             return _TR[key] + ": " + tail
     for english, turkish in _TR_EXTRA.items():
         if line.startswith("- " + english + ":"):
