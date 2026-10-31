@@ -135,6 +135,14 @@ _TR_PHRASES.update({
     "Yes - review eligible packages and plan an authorized update.": "Evet - uygun paketleri inceleyip yetkilendirilmiş güncellemeyi planlayın.",
     "No Security Watch findings were reported.": "Güvenlik izlemesinde bulgu saptanmadı.",
     "No action indicated by Security Watch.": "Güvenlik izlemesine göre işlem gerekmiyor.",
+    "The first kernel installation pass was already completed earlier; no installation or reboot repeated.": "İlk kernel kurulum denemesi daha önce tamamlandı; kurulum veya yeniden başlatma tekrarlanmadı.",
+    "Initial kernel assessment completed; automatic kernel installation was not authorized.": "İlk kernel değerlendirmesi tamamlandı; otomatik kernel kurulumu için izin verilmedi.",
+    "Enable automatic installation explicitly to install future kernel updates.": "Gelecekteki kernel güncellemelerini kurmak için otomatik kuruluma açıkça izin verin.",
+    "One-shot trial boot was staged; this message does not prove a reboot occurred.": "Tek seferlik deneme açılışı hazırlandı; bu mesaj yeniden başlatmanın gerçekleştiğini kanıtlamaz.",
+    "Yes - confirm recovery access and review reboot policy.": "Evet - kurtarma erişimini doğrulayın ve yeniden başlatma politikasını inceleyin.",
+    "inspect recovery preflight": "kurtarma ön kontrolünü inceleyin",
+    "CVEs not listed": "CVE listelenmedi",
+
     "Security Watch reported findings that require investigation.": "Güvenlik izlemesi incelenmesi gereken bulgular bildirdi.",
     "Yes - review each finding and host audit logs.": "Evet - bulguları ve sunucunun denetim kayıtlarını inceleyin.",
     "all-stable": "tüm kararlı güncellemeler",
@@ -150,11 +158,16 @@ _TR_COMMANDS = {
     "select-old": "eski kerneli seçme",
 }
 _TR_EXTRA = {
-    "available": "mevcut", "listed (not proof of unpatched CVEs)": "listelendi (yamasız CVE kanıtı değildir)",
+    "available": "mevcut",
+    "Removed obsolete kernel RPMs": "Eski kernel RPM paketleri kaldırıldı", "listed (not proof of unpatched CVEs)": "listelendi (yamasız CVE kanıtı değildir)",
     "Removed obsolete kernel RPMs": "Eski kernel RPM paketleri kaldırıldı",
 }
 
 def _translate_line(line):
+    if line.startswith("- ... ") and line.endswith(" additional packages"):
+        return line.replace(" additional packages", " ek paket")
+    if line.startswith("- ... ") and " additional advisories; use lksu check --json for details" in line:
+        return line.replace(" additional advisories; use lksu check --json for details", " ek güvenlik duyurusu; ayrıntılar için lksu check --json")
     if line in _TR_PHRASES:
         return _TR_PHRASES[line]
     if line in _TR:
@@ -165,6 +178,8 @@ def _translate_line(line):
         if key in _TR:
             tail = tail.strip()
             tail = _TR_PHRASES.get(tail, _TR.get(tail, _TR_COMMANDS.get(tail, tail)))
+            if tail.startswith("Yes - inspect recovery preflight"):
+                tail = tail.replace("Yes - inspect recovery preflight", "Evet - kurtarma ön kontrolünü inceleyin", 1)
             if key == "Package upgrades" and tail.endswith(" available"):
                 tail = tail[:-len(" available")] + " mevcut"
             elif key == "Advisories" and tail.endswith(" listed (not proof of unpatched CVEs)"):
