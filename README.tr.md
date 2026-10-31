@@ -15,6 +15,14 @@
 
 </div>
 
+
+## 🧭 İçindekiler
+
+[Kurulum](#kurulum) · [Destek](#hangi-sistemlerde-çalışır) · [SSS](#-sık-sorulan-sorular) · [Mimari](docs/architecture.md) · [Kurtarma](docs/recovery.md) · [CVE](docs/cve-security.md)
+
+> [!TIP]
+> Ayrıntılı teknik belgeler ayrı sayfalarda tutulur; burası hızlı başlangıç rehberidir.
+
 ## LKSU ne yapar?
 
 | 🔍 Kontrol | 🛠️ Güncelleme | 🧪 Doğrulama | ↩️ Geri dönüş |
