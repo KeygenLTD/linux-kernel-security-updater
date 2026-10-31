@@ -146,6 +146,8 @@ def _activate_release(target):
         for command in commands:
             link_atomically(BIN_DIR / command, current / "bin" / command)
         _cmd(str(BIN_DIR / "lksu"), "--help")
+        _cmd(str(BIN_DIR / "lksu-fleet"), "--help")
+        _require_managed_install()
     except (LKSUError, OSError, subprocess.SubprocessError):
         if previous:
             link_atomically(current, previous)
@@ -239,7 +241,11 @@ def update(*, automatic=False, enabled=False):
             except (LKSUError, OSError, subprocess.SubprocessError):
                 shutil.rmtree(candidate, ignore_errors=True)
                 raise
-        _activate_release(target)
+        try:
+            _activate_release(target)
+        except (LKSUError, OSError, subprocess.SubprocessError):
+            # Preserve failed candidate for investigation; never delete an active release.
+            raise
         return {"status": "self-updated", "previous_version": current,
                 "installed_version": info["tag"], "previous_release_retained": True,
                 "rebooted": False}
