@@ -107,3 +107,17 @@ LKSU, kontrollü deneme açılışında önceki kerneli geri dönüş seçeneği
 Şu anda hayır. Otomatik kernel değişikliği doğrulanmış AlmaLinux sürümleriyle sınırlıdır. [Destek matrisini](docs/platform-support.tr.md) inceleyin.
 
 </details>
+
+<details>
+<summary>Zero-day açıkları otomatik engelleniyor mu?</summary>
+
+Hayır. Security Watch raporlama amaçlıdır. Zero-Day Shield henüz uygulanmadı. Bir CVE için düzeltme, uygun üretici yamasının kurulup çalışan kernelde doğrulanmasını gerektirir.
+
+</details>
+
+<details>
+<summary>E-posta dili ve görünen sunucu adı değiştirilebilir mi?</summary>
+
+Evet. `sudo lksu configure-language` ve `sudo lksu configure-server-name` komutlarını kullanın.
+
+</details>
