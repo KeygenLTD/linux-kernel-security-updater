@@ -6,8 +6,32 @@ cd "$SCRIPT_DIR"
 if [[ ${EUID} -ne 0 ]]; then echo "Run as root" >&2; exit 1; fi
 source /etc/os-release
 if [[ ${ID:-} != almalinux || ! ${VERSION_ID:-} =~ ^(8|9|10)(\.|$) ]]; then echo "AlmaLinux 8, 9 or 10 required" >&2; exit 1; fi
-dnf install -y python3 python3-pip python3-rpm grubby
-python3 -m pip install --prefix=/usr/local .
+# Never modify system Python or CyberPanel's interpreter/environment.
+# Build LKSU in its own venv with a Python supported by pyproject.toml.
+dnf install -y grubby
+if [[ ${VERSION_ID%%.*} == 8 ]]; then
+  dnf install -y python39 python39-pip
+fi
+PYTHON=""
+for candidate in /usr/bin/python3.13 /usr/bin/python3.12 /usr/bin/python3.11 /usr/bin/python3.10 /usr/bin/python3.9 /usr/bin/python3; do
+  if [[ -x "$candidate" ]] && "$candidate" -c 'import sys,venv; assert sys.version_info >= (3,9)' 2>/dev/null; then
+    PYTHON="$candidate"
+    break
+  fi
+done
+[[ -n "$PYTHON" ]] || { echo "No supported Python >=3.9 with venv found; refusing to modify system Python." >&2; exit 1; }
+VENV=/opt/lksu/venv
+if [[ -e "$VENV" && ! -x "$VENV/bin/python" ]]; then
+  echo "Existing LKSU venv is incomplete; refusing to overwrite it." >&2
+  exit 1
+fi
+if [[ ! -x "$VENV/bin/python" ]]; then
+  "$PYTHON" -m venv "$VENV"
+fi
+"$VENV/bin/python" -m pip install --upgrade .
+install -d -m 0755 /usr/local/bin
+ln -sfn "$VENV/bin/lksu" /usr/local/bin/lksu
+ln -sfn "$VENV/bin/lksu-fleet" /usr/local/bin/lksu-fleet
 install -D -m 0644 systemd/lksu.service /etc/systemd/system/lksu.service
 install -D -m 0644 systemd/lksu.timer /etc/systemd/system/lksu.timer
 install -D -m 0644 systemd/lksu-maintenance.service /etc/systemd/system/lksu-maintenance.service
