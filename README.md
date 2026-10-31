@@ -16,7 +16,7 @@
 ![Version](https://img.shields.io/badge/development-0.3.23.dev0-blue)
 ![AlmaLinux](https://img.shields.io/badge/AlmaLinux-8%20%7C%209%20%7C%2010-168B4C)
 ![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB)
-[![Unit tests](https://github.com/KeygenLTD/linux-kernel-security-updater/actions/workflows/tests.yml/badge.svg?branch=fix%2Fstatus-maintenance-timer-20261031)](https://github.com/KeygenLTD/linux-kernel-security-updater/actions/workflows/tests.yml)
+[![Unit tests](https://github.com/KeygenLTD/linux-kernel-security-updater/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/KeygenLTD/linux-kernel-security-updater/actions/workflows/tests.yml)
 [![Issues](https://img.shields.io/github/issues/KeygenLTD/linux-kernel-security-updater)](https://github.com/KeygenLTD/linux-kernel-security-updater/issues)
 
 </div>
@@ -24,7 +24,7 @@
 
 ## 🧭 Quick navigation
 
-[Get started](#getting-started) · [Platforms](#supported-systems) · [FAQ](#frequently-asked-questions) · [Architecture](docs/architecture.md) · [Recovery](docs/recovery.md) · [CVE reporting](docs/cve-security.md)
+[Get started](#getting-started) · [Platforms](#supported-systems) · [FAQ](#frequently-asked-questions) · [Architecture](docs/architecture.md) · [Recovery](docs/recovery.md) · [CVE reporting](docs/cve-security.md) · [📧 SMTP](docs/email-smtp.md)
 
 > [!TIP]
 > Detailed technical guides live in separate documents to keep this page easy to scan.
@@ -64,6 +64,12 @@ Configuration can authorize **real kernel installation and reboot**. Do not run 
 
 The [release bootstrap](bootstrap.sh) currently pins **v0.3.22**, not the development version. Do not treat the development branch as a published stable release.
 
+## 📧 SMTP and email notifications
+
+LKSU can send update-event reports through Postmark, SMTP2GO or a custom SMTP provider. Initial setup requests the recipient, SMTP credentials and notification preferences.
+
+**Detailed setup, ports, TLS/STARTTLS, configuration keys, security and troubleshooting:** [SMTP and email guide](docs/email-smtp.md).
+
 ## Useful commands
 
 ```bash
@@ -86,7 +92,7 @@ lksu configure-server-name    # Email/report display name
 
 ## Documentation
 
-[Platform support](docs/platform-support.md) · [Türkçe platform desteği](docs/platform-support.tr.md) · [Previous detailed README (archive)](docs/README-legacy.md) · [Source code](src/lksu/) · [Issues](https://github.com/KeygenLTD/linux-kernel-security-updater/issues)
+[Platform support](docs/platform-support.md) · [Türkçe platform desteği](docs/platform-support.tr.md) · [Source code](src/lksu/) · [Issues](https://github.com/KeygenLTD/linux-kernel-security-updater/issues)
 
 **Security note:** A CVE is only remediated when the vendor's applicable fix is installed, the fixed kernel is running, and verification succeeds. Temporary mitigations are not equivalent to a patch.
 
