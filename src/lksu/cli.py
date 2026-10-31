@@ -73,10 +73,29 @@ def validate_reboot_health_checks(services, health_urls):
         )
 
 
+def choose_report_language(current="tr"):
+    """Choose report language; invalid answers never change saved configuration."""
+    value = input("Email report language [tr/en] (default {}): ".format(current)).strip().lower() or current
+    if value not in {"tr", "en"}:
+        raise core.LKSUError("Language must be tr or en")
+    return value
+
+
+def configure_language():
+    """Change report language on an existing host without touching SMTP or automation."""
+    if os.geteuid():
+        raise core.LKSUError("Root required")
+    cfg = core.config()
+    cfg["report_language"] = choose_report_language(cfg.get("report_language", "en"))
+    core.save(core.CONFIG, cfg)
+    print("Email report language saved: " + cfg["report_language"])
+
+
 def setup():
     if os.geteuid():
         raise core.LKSUError("Root required")
     core.os_version()
+    report_language = choose_report_language("tr")
     email = input("Report email: ").strip()
     if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
         raise core.LKSUError("Invalid email address")
@@ -126,7 +145,7 @@ def setup():
     if automatic_reboot:
         print("Automatic reboot is blocked until recovery readiness is confirmed.")
         recovery_ready = yes_no("Have you verified an external snapshot AND provider console recovery?", False)
-    core.save(core.CONFIG, {"email": email, "from_email": email, "smtp_host": host, "smtp_port": port,
+    core.save(core.CONFIG, {"report_language": report_language, "email": email, "from_email": email, "smtp_host": host, "smtp_port": port,
                             "smtp_user": user, "smtp_password": password, "policy": policy,
                             "services": parsed, "health_urls": parsed_urls,
                             "automatic_updates": automatic_updates, "automatic_lksu_updates": automatic_lksu_updates,
@@ -226,7 +245,7 @@ def send_report(cfg, subject, body):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="AlmaLinux Kernel Security Updater")
     parser.add_argument("--json", action="store_true", help="Print the full machine-readable report instead of an operator summary")
-    parser.add_argument("command", choices=("compatibility", "kernel-inventory", "configure", "configure-automation", "configure-self-update", "initialize", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check", "self-update", "self-update-check", "self-update-scheduled"))
+    parser.add_argument("command", choices=("compatibility", "kernel-inventory", "configure", "configure-automation", "configure-self-update", "configure-language", "initialize", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check", "self-update", "self-update-check", "self-update-scheduled"))
     args = parser.parse_args(argv)
     reboot_requested = False
     mail_failure = None
@@ -253,6 +272,9 @@ def main(argv=None):
             return 0
         if args.command == "configure":
             setup()
+            return 0
+        if args.command == "configure-language":
+            configure_language()
             return 0
         if args.command == "configure-self-update":
             configure_self_update()
