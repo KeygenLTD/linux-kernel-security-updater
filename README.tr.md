@@ -75,3 +75,26 @@ lksu configure-server-name    # Raporlarda görünen sunucu adı
 [Platform desteği](docs/platform-support.tr.md) · [Önceki ayrıntılı README (arşiv)](docs/README-legacy.md) · [Kaynak kod](src/lksu/) · [Hata ve öneriler](https://github.com/KeygenLTD/linux-kernel-security-updater/issues)
 
 **Not:** Bir CVE'nin kapatıldığını söylemek için üreticinin ilgili düzeltmesinin kurulması, düzeltilmiş kernelin çalışması ve doğrulama gerekir. Geçici önlem, yamanın yerini tutmaz.
+
+## ❓ Sık sorulan sorular
+
+<details>
+<summary>LKSU her 15 dakikada bir sunucuyu yeniden başlatır mı?</summary>
+
+Hayır. Her 15 dakikada bir kontrol yapılır; otomatik kurulum ve yeniden başlatma ayrı izinler ve güvenlik kontrolleri gerektirir.
+
+</details>
+
+<details>
+<summary>Kernel açılmazsa eski sürüme dönebilir miyim?</summary>
+
+LKSU, kontrollü deneme açılışında önceki kerneli geri dönüş seçeneği olarak korur. Bu kurtarma garantisi değildir; harici snapshot ve sağlayıcı konsolu erişimini hazır tutun.
+
+</details>
+
+<details>
+<summary>Ubuntu, Debian, Rocky veya CloudLinux kernellerini otomatik günceller mi?</summary>
+
+Şu anda hayır. Otomatik kernel değişikliği doğrulanmış AlmaLinux sürümleriyle sınırlıdır. [Destek matrisini](docs/platform-support.tr.md) inceleyin.
+
+</details>
