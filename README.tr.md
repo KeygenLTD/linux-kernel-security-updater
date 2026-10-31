@@ -138,3 +138,10 @@ flowchart TD
   I -->|Evet| J["Yeni kerneli kalıcı yap"]
   I -->|Hayır| K["Eski kernel geri dönüş seçeneğini koru"]
 ```
+
+## 🧩 Topluluk ve katkı
+
+[Hata bildir](https://github.com/KeygenLTD/linux-kernel-security-updater/issues/new/choose) · [Katkı rehberi](CONTRIBUTING.md) · [Güvenlik politikası](SECURITY.md) · [Kurtarma rehberi](docs/recovery.md) · [CVE rehberi](docs/cve-security.md)
+
+> [!NOTE]
+> Yol haritasındaki özellikler tamamlanmış özellikler olarak sunulmaz. Güncel durum için [issue listesine](https://github.com/KeygenLTD/linux-kernel-security-updater/issues) bakın.
