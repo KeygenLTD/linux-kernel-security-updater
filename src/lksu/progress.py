@@ -17,9 +17,10 @@ _TR_MESSAGES = {
     "/boot below the minimum free-space threshold; checking safe obsolete-kernel cleanup.": "/boot alanı minimum eşiğin altında; güvenli eski kernel temizliği değerlendiriliyor.",
     "Trial kernel prepared; sending event notification and recording fleet report before restart...": "Deneme kerneli hazırlandı; yeniden başlatmadan önce olay bildirimi ve merkezi rapor gönderiliyor...",
     "systemctl accepted the reboot request. Waiting for server startup and post-boot checks.": "systemctl yeniden başlatma isteğini kabul etti. Sunucunun açılması ve sağlık kontrolleri bekleniyor.",
-    "Requesting system reboot NOW for one-time trial kernel trial kernel. SSH may disconnect. Boot success is verified only after the server returns.": "Deneme kerneli için sistem şimdi yeniden başlatılıyor. SSH bağlantısı kesilebilir. Başarılı açılış yalnızca sunucu geri döndükten sonra doğrulanır.",
+
 }
 _TR_PREFIX = {
+    "Requesting system reboot NOW for one-time trial kernel ": "Deneme kerneli için sistem yeniden başlatılıyor: ",
     "Restart blocked: ": "Yeniden başlatma engellendi: ",
     "Reboot request failed: ": "Yeniden başlatma isteği başarısız: ",
     "Server restarted. Running kernel: ": "Sunucu yeniden başladı. Çalışan kernel: ",
@@ -43,6 +44,8 @@ def event(phase, message):
             for english, turkish in _TR_PREFIX.items():
                 if message.startswith(english):
                     message = turkish + message[len(english):]
+                    if english.startswith("Requesting system reboot NOW"):
+                        message = message.replace("SSH may disconnect. Boot success is verified only after the server returns.", "SSH bağlantısı kesilebilir. Başarılı açılış yalnızca sunucu geri döndükten sonra doğrulanır.")
                     break
         print(f"LKSU [{phase}] {message}", file=sys.stderr, flush=True)
     except OSError:
