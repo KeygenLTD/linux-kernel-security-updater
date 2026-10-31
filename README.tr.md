@@ -7,7 +7,11 @@
 
 [🇹🇷 Türkçe](README.tr.md) · [🇬🇧 English](README.md) · [İşletim sistemi desteği](docs/platform-support.tr.md)
 
-![LKSU security banner](docs/assets/lksu-banner.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/lksu-banner.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/lksu-banner-light.svg">
+  <img alt="LKSU — Linux Kernel Security Updater" src="docs/assets/lksu-banner-light.svg">
+</picture>
 
 ![Sürüm](https://img.shields.io/badge/geliştirme-0.3.23.dev0-blue)
 ![AlmaLinux](https://img.shields.io/badge/AlmaLinux-8%20%7C%209%20%7C%2010-168B4C)
