@@ -141,6 +141,21 @@ def choose_report_language(current="tr"):
     return value
 
 
+def configure_server_name():
+    """Set a human-readable server name without modifying the OS hostname."""
+    if os.geteuid():
+        raise _ui_error("Root required")
+    cfg = core.config()
+    current = cfg.get("display_name") or os.uname().nodename
+    label = "Sunucu görünen adı" if cfg.get("report_language") == "tr" else "Server display name"
+    name = input(f"{label} [{current}]: ").strip() or current
+    if len(name) > 80 or not re.fullmatch(r"[\\w .()\\-]+", name, flags=re.UNICODE):
+        raise _ui_error("Invalid server name: use up to 80 letters, numbers, spaces, dots, parentheses or hyphens")
+    cfg["display_name"] = name
+    core.save(core.CONFIG, cfg)
+    print(("Sunucu adı kaydedildi: " if cfg.get("report_language") == "tr" else "Server name saved: ") + name)
+
+
 def configure_language():
     """Change report language on an existing host without touching SMTP or automation."""
     if os.geteuid():
@@ -329,7 +344,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="AlmaLinux Kernel Security Updater")
     parser.add_argument("--version", action="version", version="LKSU " + _installed_version())
     parser.add_argument("--json", action="store_true", help="Print the full machine-readable report instead of an operator summary")
-    parser.add_argument("command", choices=("active", "compatibility", "kernel-inventory", "configure", "configure-automation", "configure-self-update", "configure-language", "initialize", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check", "self-update", "self-update-check", "self-update-scheduled"))
+    parser.add_argument("command", choices=("active", "compatibility", "kernel-inventory", "configure", "configure-automation", "configure-self-update", "configure-language", "configure-server-name", "initialize", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check", "self-update", "self-update-check", "self-update-scheduled"))
     args = parser.parse_args(argv)
     reboot_requested = False
     mail_failure = None
@@ -384,6 +399,9 @@ def main(argv=None):
             return 0
         if args.command == "configure-language":
             configure_language()
+            return 0
+        if args.command == "configure-server-name":
+            configure_server_name()
             return 0
         if args.command == "configure-self-update":
             configure_self_update()
