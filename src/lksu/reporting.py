@@ -114,6 +114,33 @@ _TR_PHRASES.update({
     "Enabled (subject to safety checks)": "Etkin (güvenlik kontrollerine bağlı)",
     "Every 15 minutes (24/7 timer)": "Her 15 dakikada (7/24 zamanlayıcı)",
 })
+_TR.update({
+    "LKSU UPDATE AVAILABLE": "LKSU GÜNCELLEMESİ MEVCUT",
+    "LKSU CURRENT": "LKSU GÜNCEL",
+    "NO LKSU RELEASE": "LKSU KARARLI SÜRÜMÜ YOK",
+    "SELF-UPDATE DISABLED": "OTOMATİK LKSU GÜNCELLEMESİ KAPALI",
+    "UPDATES AVAILABLE": "GÜNCELLEMELER MEVCUT",
+    "SECURITY OK": "GÜVENLİK KONTROLÜ TEMİZ",
+})
+_TR_PHRASES.update({
+    "A newer LKSU application release is published; no installation was performed.": "Yeni bir LKSU uygulama sürümü yayımlandı; kurulum yapılmadı.",
+    "Review the published release.": "Yayımlanan sürümü inceleyin.",
+    "LKSU application upgraded to a verified release without reboot.": "LKSU uygulaması yeniden başlatma gerektirmeden doğrulanmış sürüme yükseltildi.",
+    "Monitor the next scheduled health and kernel checks.": "Sonraki zamanlanmış sağlık ve kernel kontrollerini izleyin.",
+    "Installed LKSU application release is current.": "Kurulu LKSU uygulaması güncel.",
+    "No stable GitHub release is published; LKSU was not modified.": "GitHub'da kararlı sürüm yayımlanmamış; LKSU değiştirilmedi.",
+    "Automatic LKSU application updates are disabled by configuration.": "Otomatik LKSU güncellemeleri yapılandırmada kapalı.",
+    "A new kernel is installed or ready for boot, but unattended reboot was blocked by safety checks.": "Yeni kernel kurulu veya açılışa hazır; otomatik yeniden başlatma güvenlik kontrollerince engellendi.",
+    "Kernel updates are available; this read-only check made no changes.": "Kernel güncellemeleri mevcut; salt okunur kontrol değişiklik yapmadı.",
+    "Yes - review eligible packages and plan an authorized update.": "Evet - uygun paketleri inceleyip yetkilendirilmiş güncellemeyi planlayın.",
+    "No Security Watch findings were reported.": "Güvenlik izlemesinde bulgu saptanmadı.",
+    "No action indicated by Security Watch.": "Güvenlik izlemesine göre işlem gerekmiyor.",
+    "Security Watch reported findings that require investigation.": "Güvenlik izlemesi incelenmesi gereken bulgular bildirdi.",
+    "Yes - review each finding and host audit logs.": "Evet - bulguları ve sunucunun denetim kayıtlarını inceleyin.",
+    "all-stable": "tüm kararlı güncellemeler",
+    "security-only": "yalnızca güvenlik güncellemeleri",
+    "Unknown": "Bilinmiyor",
+})
 _TR_COMMANDS = {
     "verify": "doğrulama", "check": "kontrol", "scheduled": "zamanlanmış kontrol",
     "maintenance": "bakım", "apply": "kurulum", "initialize": "başlatma",
@@ -162,6 +189,10 @@ def _localize_report(cfg, subject, body):
         return subject, body
     for english, turkish in _TR.items():
         subject = subject.replace("[" + english + "]", "[" + turkish + "]")
+    for command, label in _TR_COMMANDS.items():
+        if subject.endswith(" | " + command):
+            subject = subject[:-len(command)] + label
+            break
     return subject, "\n".join(_translate_line(line) for line in body.split("\n"))
 
 def _os_name():
