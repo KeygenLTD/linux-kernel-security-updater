@@ -118,5 +118,76 @@ class CLIReportTests(unittest.TestCase):
         send.assert_not_called()
 
 
+
+    def test_turkish_trial_boot_does_not_claim_reboot(self):
+        cfg = dict(CONFIG, report_language="tr")
+        with patch("lksu.reporting.core.STATE") as state:
+            state.exists.return_value = False
+            subject, body = build_email_report(
+                cfg, "stage-reboot", {"status": "trial-staged", "running": "6.12.0-current"},
+                timestamp=WHEN, hostname="test-node", os_name="AlmaLinux 10",
+                installed_kernels=["6.12.0-previous"],
+            )
+        self.assertIn("deneme açılışı hazırlandı", body.lower())
+        self.assertIn("yeniden başlatmanın gerçekleştiğini kanıtlamaz", body)
+        self.assertNotIn("this message does not prove", body.lower())
+
+    def test_turkish_initial_check_only_outcome(self):
+        cfg = dict(CONFIG, report_language="tr")
+        with patch("lksu.reporting.core.STATE") as state:
+            state.exists.return_value = False
+            _, body = build_email_report(
+                cfg, "initialize", {"status": "initial-check-only", "running": "6.12.0-current"},
+                timestamp=WHEN, hostname="test-node", os_name="AlmaLinux 10",
+                installed_kernels=["6.12.0-previous"],
+            )
+        self.assertIn("otomatik kernel kurulumu için izin verilmedi", body)
+        self.assertNotIn("automatic kernel installation was not authorized", body.lower())
+
+
 if __name__ == "__main__":
     unittest.main()
+
+
+class TurkishPresentationTests(unittest.TestCase):
+    def test_numeric_console_values_are_turkish(self):
+        from lksu.reporting import _localize_report
+        body = ("Package upgrades: 0 available\n"
+                "Advisories: 35 listed (not proof of unpatched CVEs)")
+        _, translated = _localize_report({"report_language": "tr"}, "", body)
+        self.assertIn("Paket güncellemeleri: 0 mevcut", translated)
+        self.assertIn("Duyurular: 35 kayıt listelendi (yamalanmamış CVE bulunduğu anlamına gelmez)", translated)
+
+    def test_english_console_values_remain_unchanged(self):
+        from lksu.reporting import _localize_report
+        body = "Package upgrades: 0 available\nAdvisories: 35 listed (not proof of unpatched CVEs)"
+        _, translated = _localize_report({"report_language": "en"}, "", body)
+        self.assertEqual(translated, body)
+
+    def test_turkish_email_subject_and_body(self):
+        from lksu.reporting import build_email_report
+        cfg = {**CONFIG, "report_language": "tr"}
+        with patch("lksu.reporting.core.STATE") as state:
+            state.exists.return_value = False
+            subject, body = build_email_report(
+                cfg, "maintenance", {"status": "no-updates", "updates": [],
+                                     "security_advisories": [], "running": "5.14.0-test"},
+                timestamp=WHEN, hostname="test-node", os_name="AlmaLinux 9.8",
+                installed_kernels=["5.14.0-test"])
+        self.assertIn("GÜNCELLEME YOK", subject)
+        self.assertIn("Özet", body)
+        self.assertIn("Çalışan kernel", body)
+
+    def test_english_email_subject_and_body(self):
+        from lksu.reporting import build_email_report
+        cfg = {**CONFIG, "report_language": "en"}
+        with patch("lksu.reporting.core.STATE") as state:
+            state.exists.return_value = False
+            subject, body = build_email_report(
+                cfg, "maintenance", {"status": "no-updates", "updates": [],
+                                     "security_advisories": [], "running": "5.14.0-test"},
+                timestamp=WHEN, hostname="test-node", os_name="AlmaLinux 9.8",
+                installed_kernels=["5.14.0-test"])
+        self.assertIn("NO UPDATES", subject)
+        self.assertIn("Summary", body)
+        self.assertIn("Running kernel", body)

@@ -6,3 +6,12 @@ Do not include SMTP credentials, server addresses, logs containing private data,
 
 Security fixes are provided on a best-effort basis. No version is currently designated as a long-term supported release.
 
+
+## Additional resources
+
+- [CVE reporting and patch verification](docs/cve-security.md)
+- [Recovery playbook](docs/recovery.md)
+- [Platform support matrix](docs/platform-support.md)
+
+> [!CAUTION]
+> A reported CVE does not prove a host is vulnerable or protected. Confirm the vendor patch, running kernel and post-boot verification.

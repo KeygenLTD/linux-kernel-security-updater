@@ -8,6 +8,11 @@ from lksu import core
 
 
 class KernelTests(unittest.TestCase):
+    def setUp(self):
+        space = patch.object(core, "required_boot_free_bytes", return_value=500 * 1024 * 1024)
+        space.start()
+        self.addCleanup(space.stop)
+
     def test_check_rejects_unexpected_repoquery_output(self):
         with patch.object(core, "preflight", return_value={"running": "old"}), patch.object(
             core, "run", return_value=type("P", (), {"returncode": 0, "stdout": "bogus output", "stderr": ""})()

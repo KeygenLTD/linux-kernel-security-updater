@@ -87,6 +87,7 @@ class ConsoleTests(unittest.TestCase):
         self, prompt, _token, _root, _os, save
     ):
         prompt.side_effect = lambda label: (
+            "en" if "[tr/en]" in label else
             "operator@example.com" if label == "Report email: " else
             "lsws" if label.startswith("Services to verify after reboot") else ""
         )
@@ -296,3 +297,40 @@ class ConsoleTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class StatusCommandTests(unittest.TestCase):
+    @patch("lksu.cli.core.config", return_value={**CFG, "report_language": "tr"})
+    @patch("lksu.cli.core.run")
+    def test_active_reads_real_timer_and_shows_turkish(self, run, config):
+        from types import SimpleNamespace
+        run.side_effect = [
+            SimpleNamespace(returncode=0, stdout="active\n"),
+            SimpleNamespace(returncode=0, stdout="enabled\n"),
+        ]
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            self.assertEqual(cli.main(["active"]), 0)
+        self.assertIn("ETKİN", buffer.getvalue())
+        self.assertIn("Zamanlayıcı çalışıyor: Evet", buffer.getvalue())
+
+    @patch("lksu.cli.core.config", return_value={**CFG, "report_language": "en"})
+    @patch("lksu.cli.core.run")
+    def test_active_json_keeps_machine_keys(self, run, config):
+        from types import SimpleNamespace
+        run.side_effect = [
+            SimpleNamespace(returncode=0, stdout="inactive\n"),
+            SimpleNamespace(returncode=1, stdout="disabled\n"),
+        ]
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            self.assertEqual(cli.main(["active", "--json"]), 0)
+        data = __import__("json").loads(buffer.getvalue())
+        self.assertFalse(data["timer_active"])
+        self.assertFalse(data["timer_enabled"])
+
+    def test_version_flag_exits_without_config_or_kernel_operations(self):
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer), self.assertRaises(SystemExit) as raised:
+            cli.main(["--version"])
+        self.assertEqual(raised.exception.code, 0)
+        self.assertIn("LKSU ", buffer.getvalue())

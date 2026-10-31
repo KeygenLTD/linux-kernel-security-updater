@@ -10,7 +10,6 @@ import shutil
 
 from . import core
 
-MIN_BOOT_FREE = 500 * 1024 * 1024
 KERNEL_RPM_NAMES = (
     "kernel", "kernel-core", "kernel-modules",
     "kernel-modules-core", "kernel-modules-extra",
@@ -93,7 +92,7 @@ def reclaim_for_update():
     if os.geteuid():
         raise core.LKSUError("Root required for kernel cleanup")
     removed = []
-    while shutil.disk_usage("/boot").free < MIN_BOOT_FREE:
+    while shutil.disk_usage("/boot").free < core.required_boot_free_bytes():
         versions = _kernel_core_install_times()
         protected = _protected_releases(versions)
         if len(versions) <= 2:

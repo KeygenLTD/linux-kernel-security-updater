@@ -30,8 +30,10 @@ def security_advisories():
                 update_id = re.search(r"Update ID\s*:\s*(\S+)", block, re.I)
                 if update_id and update_id.group(1) in found:
                     found[update_id.group(1)]["cves"] = sorted(set(x.upper() for x in CVE.findall(block)))
-            if len(found) == 1 and not any(item["cves"] for item in found.values()):
-                next(iter(found.values()))["cves"] = sorted(set(x.upper() for x in CVE.findall(detail.stdout)))
+            # Never attribute an unscoped CVE to a kernel advisory: DNF output
+            # may include unrelated package advisories or omit Update ID headers.
+            if any(not item["cves"] for item in found.values()):
+                warning = "Some kernel advisories have no verifiable CVE mapping in DNF metadata"
         except LKSUError as exc:
             warning = f"Advisory details unavailable: {exc}"
     result = sorted(found.values(), key=lambda item: item["id"])

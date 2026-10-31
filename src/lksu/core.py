@@ -77,6 +77,21 @@ def default_kernel():
     return value
 
 
+def required_boot_free_bytes():
+    """Conservative space guard: 150 MiB reserve plus observed kernel artifacts.
+
+    Unknown or absent artifacts fail closed rather than assuming a tiny kernel.
+    This is a host-side estimate, not a substitute for DNF transaction checks.
+    """
+    mib = 1024 * 1024
+    images = [p.stat().st_size for p in Path("/boot").glob("vmlinuz-*") if p.is_file()]
+    initramfs = [p.stat().st_size for p in Path("/boot").glob("initramfs-*.img")
+                 if p.is_file() and "kdump" not in p.name]
+    if not images or not initramfs:
+        raise LKSUError("Cannot estimate /boot requirements without kernel and initramfs images")
+    return 150 * mib + max(images) + max(initramfs) + 64 * mib
+
+
 def preflight(require_boot_space=True):
     version = os_version()
     for binary in ("dnf", "rpm", "grubby", "findmnt", "systemctl"):
@@ -87,8 +102,8 @@ def preflight(require_boot_space=True):
     if run("findmnt", "-n", "-o", "OPTIONS", "/boot", check=False).returncode == 0:
         pass  # /boot may also be part of /; disk_usage handles either layout.
     boot = shutil.disk_usage("/boot")
-    if require_boot_space and boot.free < 500 * 1024 * 1024:
-        raise LKSUError("Less than 500 MiB free on /boot")
+    if require_boot_space and boot.free < required_boot_free_bytes():
+        raise LKSUError("Insufficient /boot space for kernel artifacts and 150 MiB reserve")
     if not Path("/boot/grub2/grub.cfg").exists() and not Path("/boot/efi/EFI/almalinux/grub.cfg").exists():
         raise LKSUError("GRUB configuration not found")
     running = os.uname().release
@@ -138,7 +153,7 @@ def apply(policy):
         raise LKSUError("Prior update still awaits post-boot verification")
     old = before["running"]
     removed_old_kernels = []
-    if before.get("boot_free_mib", 500) < 500:
+    if before.get("boot_free_mib", 0) * 1048576 < required_boot_free_bytes():
         event("CLEANUP", "/boot below the minimum free-space threshold; checking safe obsolete-kernel cleanup.")
         from .kernel_cleanup import reclaim_for_update
         removed_old_kernels = reclaim_for_update()

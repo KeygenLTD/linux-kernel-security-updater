@@ -82,6 +82,46 @@ class SelfUpdateTests(unittest.TestCase):
             with self.assertRaisesRegex(core.LKSUError, "Root"):
                 self_update.update()
 
+    def test_unmanaged_development_install_blocks_self_update_before_network(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder) / "lksu"
+            binary = Path(folder) / "bin"
+            root.mkdir()
+            binary.mkdir()
+            development = Path(folder) / "development"
+            (development / "bin").mkdir(parents=True)
+            (development / "bin" / "lksu").write_text("#!/bin/sh\\n")
+            (binary / "lksu").symlink_to(development / "bin" / "lksu")
+            with patch.object(self_update, "ROOT", root), patch.object(self_update, "BIN_DIR", binary), patch.object(
+                self_update, "release_info"
+            ) as network, patch.object(self_update.os, "geteuid", return_value=0):
+                with self.assertRaisesRegex(core.LKSUError, "Unmanaged"):
+                    self_update.update()
+                network.assert_not_called()
+
+    def test_managed_activation_switches_both_wrappers_and_preserves_previous(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root, binary = Path(folder) / "root", Path(folder) / "bin"
+            releases = root / "releases"
+            old, new = releases / "v0.3.22", releases / "v0.3.23"
+            for candidate in (old, new):
+                (candidate / "bin").mkdir(parents=True)
+                for command in ("lksu", "lksu-fleet"):
+                    (candidate / "bin" / command).write_text("#!/bin/sh\\n")
+            binary.mkdir()
+            (root / "current").symlink_to(old)
+            for command in ("lksu", "lksu-fleet"):
+                (binary / command).symlink_to(root / "current" / "bin" / command)
+            with patch.object(self_update, "ROOT", root), patch.object(self_update, "BIN_DIR", binary), patch.object(
+                self_update, "_cmd", return_value=""
+            ) as run:
+                self_update._activate_release(new)
+                self.assertEqual((root / "current").resolve(), new)
+                self.assertEqual((binary / "lksu").resolve(), new / "bin" / "lksu")
+                self.assertEqual((binary / "lksu-fleet").resolve(), new / "bin" / "lksu-fleet")
+                self.assertTrue(old.exists())
+                self.assertEqual(run.call_count, 2)
+
     def test_legacy_entrypoints_restored_if_new_lksu_fails(self):
         with tempfile.TemporaryDirectory() as folder:
             root, binary = Path(folder) / "root", Path(folder) / "bin"

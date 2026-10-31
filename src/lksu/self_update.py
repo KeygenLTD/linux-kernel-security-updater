@@ -146,6 +146,8 @@ def _activate_release(target):
         for command in commands:
             link_atomically(BIN_DIR / command, current / "bin" / command)
         _cmd(str(BIN_DIR / "lksu"), "--help")
+        _cmd(str(BIN_DIR / "lksu-fleet"), "--help")
+        _require_managed_install()
     except (LKSUError, OSError, subprocess.SubprocessError):
         if previous:
             link_atomically(current, previous)
@@ -163,6 +165,22 @@ def _activate_release(target):
             elif path.is_symlink():
                 path.unlink()
         raise
+
+
+def _require_managed_install():
+    """Never replace a legacy or development CLI without an explicit migration."""
+    current = ROOT / "current"
+    executable = BIN_DIR / "lksu"
+    if not current.is_symlink() or not executable.is_symlink():
+        raise LKSUError("Unmanaged LKSU installation: automatic self-update blocked; migrate to a versioned release first")
+    try:
+        active = current.resolve(strict=True)
+        wrapper = executable.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise LKSUError("Cannot verify the active LKSU release paths") from exc
+    releases = (ROOT / "releases").resolve()
+    if active.parent != releases or wrapper != active / "bin" / "lksu":
+        raise LKSUError("Active LKSU is not a managed versioned release; self-update blocked")
 
 
 def check():
@@ -190,6 +208,7 @@ def update(*, automatic=False, enabled=False):
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
             raise LKSUError("Another LKSU self-update is running") from exc
+        _require_managed_install()
         current = installed_version()
         try:
             info = release_info()
@@ -222,7 +241,11 @@ def update(*, automatic=False, enabled=False):
             except (LKSUError, OSError, subprocess.SubprocessError):
                 shutil.rmtree(candidate, ignore_errors=True)
                 raise
-        _activate_release(target)
+        try:
+            _activate_release(target)
+        except (LKSUError, OSError, subprocess.SubprocessError):
+            # Preserve failed candidate for investigation; never delete an active release.
+            raise
         return {"status": "self-updated", "previous_version": current,
                 "installed_version": info["tag"], "previous_release_retained": True,
                 "rebooted": False}

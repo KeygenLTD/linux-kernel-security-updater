@@ -92,7 +92,7 @@ class InitialInstallTests(unittest.TestCase):
         self, cfg, fleet, send, run, initial, lock
     ):
         err = io.StringIO()
-        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+        with patch("lksu.progress._language", return_value="en"), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
             self.assertEqual(cli.main(["initialize"]), 0)
         initial.assert_called_once()
         run.assert_called_once_with("systemctl", "reboot")
@@ -112,7 +112,7 @@ class InitialInstallTests(unittest.TestCase):
     })
     def test_reboot_status_keeps_machine_readable_stdout_clean(self, cfg, fleet, run, initial, lock):
         stdout, stderr = io.StringIO(), io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        with patch("lksu.progress._language", return_value="en"), contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             self.assertEqual(cli.main(["--json", "initialize"]), 0)
         self.assertEqual(json.loads(stdout.getvalue())["status"], "trial-boot-staged")
         self.assertIn("Requesting system reboot NOW", stderr.getvalue())
@@ -130,7 +130,7 @@ class InitialInstallTests(unittest.TestCase):
     })
     def test_failed_reboot_request_is_visible(self, cfg, fleet, run, initial, lock):
         stdout, stderr = io.StringIO(), io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        with patch("lksu.progress._language", return_value="en"), contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             self.assertEqual(cli.main(["initialize"]), 1)
         self.assertIn("Requesting system reboot NOW", stderr.getvalue())
         self.assertIn("Reboot request failed", stderr.getvalue())
