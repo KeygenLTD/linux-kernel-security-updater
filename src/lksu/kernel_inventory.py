@@ -59,18 +59,21 @@ def rpm_inventory(distro):
         name, release = parts
         if RPM_KERNEL.fullmatch(name) and SAFE_PACKAGE.fullmatch(release):
             kernels.append({"name": name, "version": release})
+    supported = distro.update_capability == "enabled" and distro.reboot_capability == "guarded"
     return {"distribution": distro.identifier, "version": distro.version,
             "running_kernel": core.os.uname().release,
             "installed_kernel_packages": kernels,
-            "automatic_updates": "blocked", "automatic_reboot": "blocked",
-            "note": "Read-only RPM inventory; vendor modules and boot path not validated"}
+            "automatic_updates": "configured-separately" if supported else "blocked",
+            "automatic_reboot": "configured-separately" if supported else "blocked",
+            "note": ("Read-only RPM inventory; automation policy is reported by lksu check" if supported
+                     else "Read-only RPM inventory; vendor modules and boot path not validated")}
 
 
 def inventory():
     distro = detect()
     if distro.family == "debian":
         return apt_inventory(distro)
-    if distro.package_manager == "dnf/rpm" and distro.identifier != "almalinux":
+    if distro.package_manager == "dnf/rpm":
         return rpm_inventory(distro)
     return {"distribution": distro.identifier, "version": distro.version,
             "automatic_updates": "blocked", "automatic_reboot": "blocked",
