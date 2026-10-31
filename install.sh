@@ -20,18 +20,37 @@ for candidate in /usr/bin/python3.13 /usr/bin/python3.12 /usr/bin/python3.11 /us
   fi
 done
 [[ -n "$PYTHON" ]] || { echo "No supported Python >=3.9 with venv found; refusing to modify system Python." >&2; exit 1; }
+# Stage and verify before touching the active command. Never replace a working
+# installation with an untested environment.
 VENV=/opt/lksu/venv
-if [[ -e "$VENV" && ! -x "$VENV/bin/python" ]]; then
-  echo "Existing LKSU venv is incomplete; refusing to overwrite it." >&2
+STAGE=$(mktemp -d /opt/lksu/.venv-stage.XXXXXXXX)
+cleanup() { if [[ -d "$STAGE" ]]; then rm -rf -- "$STAGE"; fi; }
+trap cleanup EXIT
+"$PYTHON" -m venv "$STAGE"
+"$STAGE/bin/python" -m pip --version >/dev/null || {
+  echo "venv pip unavailable; existing LKSU remains unchanged" >&2
+  exit 1
+}
+"$STAGE/bin/python" -m pip install .
+"$STAGE/bin/python" -c 'from lksu.cli import main; from lksu.fleet import main as fleet_main'
+"$STAGE/bin/lksu" --help >/dev/null
+if [[ -e "$VENV" || -L "$VENV" ]]; then
+  echo "Existing $VENV detected; refusing to overwrite it automatically." >&2
   exit 1
 fi
-if [[ ! -x "$VENV/bin/python" ]]; then
-  "$PYTHON" -m venv "$VENV"
-fi
-"$VENV/bin/python" -m pip install --upgrade .
+mv -- "$STAGE" "$VENV"
+trap - EXIT
+# A venv moved after creation can contain absolute paths to its staging
+# directory. Regenerate console entrypoints with the final venv location.
+"$VENV/bin/python" -m pip install --force-reinstall --no-deps --no-build-isolation .
+"$VENV/bin/lksu" --help >/dev/null
 install -d -m 0755 /usr/local/bin
-ln -sfn "$VENV/bin/lksu" /usr/local/bin/lksu
-ln -sfn "$VENV/bin/lksu-fleet" /usr/local/bin/lksu-fleet
+for cmd in lksu lksu-fleet; do
+  link="/usr/local/bin/$cmd"
+  tmp="/usr/local/bin/.$cmd.new.$"
+  ln -s "$VENV/bin/$cmd" "$tmp"
+  mv -Tf "$tmp" "$link"
+done
 install -D -m 0644 systemd/lksu.service /etc/systemd/system/lksu.service
 install -D -m 0644 systemd/lksu.timer /etc/systemd/system/lksu.timer
 install -D -m 0644 systemd/lksu-maintenance.service /etc/systemd/system/lksu-maintenance.service
