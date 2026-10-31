@@ -165,6 +165,22 @@ def _activate_release(target):
         raise
 
 
+def _require_managed_install():
+    """Never replace a legacy or development CLI without an explicit migration."""
+    current = ROOT / "current"
+    executable = BIN_DIR / "lksu"
+    if not current.is_symlink() or not executable.is_symlink():
+        raise LKSUError("Unmanaged LKSU installation: automatic self-update blocked; migrate to a versioned release first")
+    try:
+        active = current.resolve(strict=True)
+        wrapper = executable.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise LKSUError("Cannot verify the active LKSU release paths") from exc
+    releases = (ROOT / "releases").resolve()
+    if active.parent != releases or wrapper != active / "bin" / "lksu":
+        raise LKSUError("Active LKSU is not a managed versioned release; self-update blocked")
+
+
 def check():
     current = installed_version()
     try:
@@ -190,6 +206,7 @@ def update(*, automatic=False, enabled=False):
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
             raise LKSUError("Another LKSU self-update is running") from exc
+        _require_managed_install()
         current = installed_version()
         try:
             info = release_info()
