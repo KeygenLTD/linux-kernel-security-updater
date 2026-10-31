@@ -82,6 +82,23 @@ class SelfUpdateTests(unittest.TestCase):
             with self.assertRaisesRegex(core.LKSUError, "Root"):
                 self_update.update()
 
+    def test_unmanaged_development_install_blocks_self_update_before_network(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder) / "lksu"
+            binary = Path(folder) / "bin"
+            root.mkdir()
+            binary.mkdir()
+            development = Path(folder) / "development"
+            (development / "bin").mkdir(parents=True)
+            (development / "bin" / "lksu").write_text("#!/bin/sh\\n")
+            (binary / "lksu").symlink_to(development / "bin" / "lksu")
+            with patch.object(self_update, "ROOT", root), patch.object(self_update, "BIN_DIR", binary), patch.object(
+                self_update, "release_info"
+            ) as network, patch.object(self_update.os, "geteuid", return_value=0):
+                with self.assertRaisesRegex(core.LKSUError, "Unmanaged"):
+                    self_update.update()
+                network.assert_not_called()
+
     def test_legacy_entrypoints_restored_if_new_lksu_fails(self):
         with tempfile.TemporaryDirectory() as folder:
             root, binary = Path(folder) / "root", Path(folder) / "bin"
