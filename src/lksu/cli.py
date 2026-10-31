@@ -43,6 +43,10 @@ _TR_UI = {
   "Have you verified an external snapshot AND provider console recovery?": "Harici snapshot VE sağlayıcı konsolundan kurtarmayı doğruladınız mı?",
   "Automatically install verified LKSU application releases? [Y/n]: ": "Doğrulanmış LKSU sürümleri otomatik kurulsun mu? [E/h]: ",
   "Root required": "Root yetkisi gerekli",
+  "Configuration saved; automatic reboot is enabled.": "Yapılandırma kaydedildi; otomatik yeniden başlatma etkin.",
+  "Configuration saved; automatic reboot is disabled.": "Yapılandırma kaydedildi; otomatik yeniden başlatma devre dışı.",
+  "Configuration only: kernel installation/reboot has NOT started. Run the bootstrap installer or 'lksu initialize' for the first managed update.": "Yalnızca yapılandırma kaydedildi; kernel kurulumu veya yeniden başlatma BAŞLAMADI. İlk yönetilen güncelleme için bootstrap kurucusunu veya 'lksu initialize' komutunu çalıştırın.",
+  "none": "yok",
   "Invalid server name: use up to 80 letters, numbers, spaces, dots, parentheses or hyphens": "Geçersiz sunucu adı: en fazla 80 harf, rakam, boşluk, nokta, parantez veya tire kullanın",
   "Dil tr veya en olmalıdır / Language must be tr or en": "Dil tr veya en olmalıdır",
   "Automatic LKSU application updates: ": "Otomatik LKSU uygulama güncellemeleri: ",
@@ -64,6 +68,19 @@ _TR_UI = {
   "Configured reboot health checks: ": "Yapılandırılan yeniden başlatma sağlık kontrolleri: ",
   "Detected running application services: ": "Algılanan çalışan uygulama servisleri: ",
   "Selected running application health checks: ": "Seçilen çalışan uygulama sağlık kontrolleri: "
+}
+_COMPAT_REASONS_TR = {
+    "Existing LKSU AlmaLinux implementation": "Mevcut LKSU AlmaLinux uygulaması",
+    "CloudLinux kernel/LVE module and LTS/hybrid compatibility require independent validation; never substitute generic RPM kernels": "CloudLinux kernel/LVE modülü ve LTS/hibrit uyumluluğu ayrıca doğrulanmalıdır; genel RPM kernelleriyle değiştirmeyin",
+    "RPM tools are similar, but kernel/GRUB lifecycle is not verified": "RPM araçları benzer, ancak kernel/GRUB yaşam döngüsü doğrulanmadı",
+    "APT kernel packaging and one-shot boot recovery require a dedicated backend": "APT kernel paketleme ve tek seferlik açılış kurtarması ayrı bir altyapı gerektirir",
+    "SUSE kernel packages, transactional updates and recovery not validated": "SUSE kernel paketleri, işlemsel güncellemeler ve kurtarma doğrulanmadı",
+    "APK kernel boot flow and rollback not implemented": "APK kernel açılışı ve geri dönüş uygulanmadı",
+    "Source-built kernel provisioning cannot be safely assumed": "Kaynak koddan derlenen kernellerin güvenli kurulumu varsayılamaz",
+    "XBPS kernel and boot rollback not implemented": "XBPS kernel ve açılış geri dönüşü uygulanmadı",
+    "NixOS generations require a native backend": "NixOS nesilleri yerel bir altyapı gerektirir",
+    "Pacman kernel updates and boot recovery require separate implementation": "Pacman kernel güncellemeleri ve açılış kurtarması ayrı uygulama gerektirir",
+    "Unrecognized distribution: do not update or reboot": "Tanınmayan dağıtım: güncelleme veya yeniden başlatma yapmayın",
 }
 _UI_LANG = 'en'
 def _ui(message):
@@ -234,8 +251,8 @@ def setup():
                                                "require_selinux_enforcing": True,
                                                "ssh_failure_threshold": 5,
                                                "watched_files": ["/etc/ssh/sshd_config", "/etc/sudoers"]}})
-    print(f"Configuration saved; automatic reboot is {'enabled' if automatic_reboot else 'disabled'}.")
-    print("Configuration only: kernel installation/reboot has NOT started. Run the bootstrap installer or 'lksu initialize' for the first managed update.")
+    print(_ui("Configuration saved; automatic reboot is enabled." if automatic_reboot else "Configuration saved; automatic reboot is disabled."))
+    print(_ui("Configuration only: kernel installation/reboot has NOT started. Run the bootstrap installer or 'lksu initialize' for the first managed update."))
 
 
 def configure_automation():
@@ -261,7 +278,7 @@ def configure_automation():
             defaults = current_services
         else:
             defaults = detect_active_host_services()
-            print(_ui("Detected running application services: ") + (", ".join(defaults) if defaults else "none"))
+            print(_ui("Detected running application services: ") + (", ".join(defaults) if defaults else _ui("none")))
         names = _ui_input(
             "Services to check before and after reboot (comma separated, Enter to keep suggestions; 'none' for URL-only): "
         ).strip()
@@ -368,13 +385,24 @@ def main(argv=None):
                     print(f"{label}: {('Evet' if status[key] else 'Hayır') if _UI_LANG == 'tr' else ('Yes' if status[key] else 'No')}")
             return 0
         if args.command == "compatibility":
+            try:
+                _set_ui_language(core.config().get("report_language", "en"))
+            except (core.LKSUError, OSError, ValueError):
+                _set_ui_language("en")
             from .distributions import detect
             assessment = detect().as_dict()
             if args.json:
                 print(json.dumps(assessment, indent=2))
             else:
+                labels = {"identifier": "Dağıtım kimliği", "version": "Sürüm", "family": "Aile", "package_manager": "Paket yöneticisi", "kernel_backend": "Kernel altyapısı", "boot_backend": "Açılış altyapısı", "update_capability": "Güncelleme yeteneği", "reboot_capability": "Yeniden başlatma yeteneği", "reason": "Açıklama"}
+                values = {"enabled": "etkin", "guarded": "korumalı", "blocked": "engellendi", "not-validated": "doğrulanmadı", "not-implemented": "uygulanmadı", "unsupported": "desteklenmiyor"}
                 for key, value in assessment.items():
-                    print(f"{key.replace('_', ' ').capitalize()}: {value}")
+                    label = labels.get(key, key.replace("_", " ").capitalize()) if _UI_LANG == "tr" else key.replace("_", " ").capitalize()
+                    if _UI_LANG == "tr" and key == "reason":
+                        value = _COMPAT_REASONS_TR.get(value, value)
+                    elif _UI_LANG == "tr" and isinstance(value, str):
+                        value = values.get(value, value)
+                    print(f"{label}: {value}")
             return 0
         if args.command == "kernel-inventory":
             try:
