@@ -121,3 +121,20 @@ Hayır. Security Watch raporlama amaçlıdır. Zero-Day Shield henüz uygulanmad
 Evet. `sudo lksu configure-language` ve `sudo lksu configure-server-name` komutlarını kullanın.
 
 </details>
+
+## 🔄 Güncelleme akışı
+
+```mermaid
+flowchart TD
+  A["15 dakikada bir kontrol"] --> B{"Uygun güncelleme?"}
+  B -->|Hayır| C["Durumu raporla"]
+  B -->|Evet| D{"Kurulum izni var mı?"}
+  D -->|Hayır| C
+  D -->|Evet| E["Resmî depodan kernel kurulumu"]
+  E --> F{"Kurtarma ve sağlık kontrolleri geçti mi?"}
+  F -->|Hayır| G["Yeniden başlatmayı engelle"]
+  F -->|Evet| H["Tek seferlik GRUB deneme açılışı"]
+  H --> I{"Açılış sonrası kontroller geçti mi?"}
+  I -->|Evet| J["Yeni kerneli kalıcı yap"]
+  I -->|Hayır| K["Eski kernel geri dönüş seçeneğini koru"]
+```
