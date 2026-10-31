@@ -12,3 +12,10 @@ python3 -m compileall -q src
 
 For changes to kernel installation or boot selection, document the AlmaLinux version, architecture, BIOS or UEFI mode, DNF transaction, installed kernel list, default GRUB entry, reboot result, health checks, and console recovery result. Remove hostnames, addresses, credentials, and personal data from evidence.
 
+
+## Pull request workflow
+
+- Review [architecture](docs/architecture.md) and [platform support](docs/platform-support.md).
+- Use the pull request template to describe safety impact and tests.
+- Distinguish mocked unit tests, VM smoke tests and actual production validation.
+- Do not publish security vulnerabilities in public issues; see [SECURITY.md](SECURITY.md).
