@@ -120,3 +120,19 @@ class CLIReportTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TurkishPresentationTests(unittest.TestCase):
+    def test_numeric_console_values_are_turkish(self):
+        from lksu.reporting import _localize_report
+        body = ("Package upgrades: 0 available\n"
+                "Advisories: 35 listed (not proof of unpatched CVEs)")
+        _, translated = _localize_report({"report_language": "tr"}, "", body)
+        self.assertIn("Paket güncellemeleri: 0 mevcut", translated)
+        self.assertIn("Duyurular: 35 kayıt listelendi (yamalanmamış CVE bulunduğu anlamına gelmez)", translated)
+
+    def test_english_console_values_remain_unchanged(self):
+        from lksu.reporting import _localize_report
+        body = "Package upgrades: 0 available\nAdvisories: 35 listed (not proof of unpatched CVEs)"
+        _, translated = _localize_report({"report_language": "en"}, "", body)
+        self.assertEqual(translated, body)
