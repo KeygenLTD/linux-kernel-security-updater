@@ -72,6 +72,6 @@ lksu configure-server-name    # Email/report display name
 
 ## Documentation
 
-[Platform support](docs/platform-support.md) · [Previous detailed README (archive)](docs/README-legacy.md) · [Source code](src/lksu/) · [Issues](https://github.com/KeygenLTD/linux-kernel-security-updater/issues)
+[Platform support](docs/platform-support.md) · [Türkçe platform desteği](docs/platform-support.tr.md) · [Previous detailed README (archive)](docs/README-legacy.md) · [Source code](src/lksu/) · [Issues](https://github.com/KeygenLTD/linux-kernel-security-updater/issues)
 
 **Security note:** A CVE is only remediated when the vendor's applicable fix is installed, the fixed kernel is running, and verification succeeds. Temporary mitigations are not equivalent to a patch.
