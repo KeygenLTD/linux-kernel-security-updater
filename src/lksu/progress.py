@@ -17,6 +17,7 @@ _TR_MESSAGES = {
     "/boot below the minimum free-space threshold; checking safe obsolete-kernel cleanup.": "/boot alanı minimum eşiğin altında; güvenli eski kernel temizliği değerlendiriliyor.",
     "Trial kernel prepared; sending event notification and recording fleet report before restart...": "Deneme kerneli hazırlandı; yeniden başlatmadan önce olay bildirimi ve merkezi rapor gönderiliyor...",
     "systemctl accepted the reboot request. Waiting for server startup and post-boot checks.": "systemctl yeniden başlatma isteğini kabul etti. Sunucunun açılması ve sağlık kontrolleri bekleniyor.",
+    "Requesting system reboot NOW for one-time trial kernel trial kernel. SSH may disconnect. Boot success is verified only after the server returns.": "Deneme kerneli için sistem şimdi yeniden başlatılıyor. SSH bağlantısı kesilebilir. Başarılı açılış yalnızca sunucu geri döndükten sonra doğrulanır.",
 }
 _TR_PREFIX = {
     "Restart blocked: ": "Yeniden başlatma engellendi: ",
