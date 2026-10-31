@@ -145,3 +145,19 @@ flowchart TD
 
 > [!NOTE]
 > Yol haritasındaki özellikler tamamlanmış özellikler olarak sunulmaz. Güncel durum için [issue listesine](https://github.com/KeygenLTD/linux-kernel-security-updater/issues) bakın.
+
+## 🧰 Sorun giderme
+
+<details>
+<summary>Güncelleme neden başlamıyor?</summary>
+
+`lksu active`, `lksu check --json` ve `lksu compatibility --json` çıktılarını inceleyin. Otomatik kurulum iznini ve dağıtım desteğini kontrol edin.
+
+</details>
+
+<details>
+<summary>Kernel kuruldu ancak sunucu yeniden başlamadı; neden?</summary>
+
+`sudo lksu configure-automation` ile izinleri inceleyin. Snapshot/konsol onayı, sağlık kontrolleri veya doğrulama servisi şartları sağlanmadıysa yeniden başlatma güvenlik nedeniyle engellenebilir.
+
+</details>
