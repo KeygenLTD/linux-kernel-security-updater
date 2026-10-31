@@ -1,6 +1,7 @@
 import argparse
 import getpass
 import json
+from importlib.metadata import PackageNotFoundError, version as package_version
 import os
 import re
 import smtplib
@@ -42,6 +43,9 @@ _TR_UI = {
   "Have you verified an external snapshot AND provider console recovery?": "Harici snapshot VE sağlayıcı konsolundan kurtarmayı doğruladınız mı?",
   "Automatically install verified LKSU application releases? [Y/n]: ": "Doğrulanmış LKSU sürümleri otomatik kurulsun mu? [E/h]: ",
   "Root required": "Root yetkisi gerekli",
+  "Automatic reboot requires at least one configured service or URL health check. No reboot configuration was saved.": "Otomatik yeniden başlatma için en az bir servis veya URL sağlık kontrolü gereklidir. Yapılandırma kaydedilmedi.",
+  "Automatic kernel installation requires security-only or all-stable": "Otomatik kernel kurulumu için security-only veya all-stable politikası gerekir.",
+  "Invalid report_language; expected tr or en": "Geçersiz rapor dili; tr veya en olmalıdır.",
   "Invalid email address": "Geçersiz e-posta adresi",
   "Invalid mail provider": "Geçersiz e-posta sağlayıcısı",
   "Invalid mail configuration": "Geçersiz e-posta yapılandırması",
@@ -122,10 +126,7 @@ def detect_active_host_services():
 
 def validate_reboot_health_checks(services, health_urls):
     if not services and not health_urls:
-        raise core.LKSUError(
-            "Automatic reboot requires at least one configured service or URL health check. "
-            "No reboot configuration was saved."
-        )
+        raise _ui_error("Automatic reboot requires at least one configured service or URL health check. No reboot configuration was saved.")
 
 
 def _language_label(lang):
@@ -183,7 +184,7 @@ def setup():
     automatic_reboot = yes_no("Automatically reboot after installing a kernel when recovery checks pass?", True)
     default_policy = "all-stable" if automatic_updates else "check-only"
     policy = _ui_input(
-        f"Install policy [check-only/security-only/all-stable] (default {default_policy}): "
+        ("Kernel kurulum politikası" if _UI_LANG == "tr" else "Install policy") + f" [check-only/security-only/all-stable] ({'varsayılan' if _UI_LANG == 'tr' else 'default'} {default_policy}): "
     ).strip() or default_policy
     if automatic_updates and policy == "check-only":
         raise _ui_error("Automatic kernel installation requires security-only or all-stable")
@@ -203,7 +204,7 @@ def setup():
         validate_reboot_health_checks(parsed, parsed_urls)
     recovery_ready = False
     if automatic_reboot:
-        print("Automatic reboot is blocked until recovery readiness is confirmed.")
+        print(_ui("Automatic reboot is blocked until recovery readiness is confirmed."))
         recovery_ready = yes_no("Have you verified an external snapshot AND provider console recovery?", False)
     core.save(core.CONFIG, {"report_language": report_language, "email": email, "from_email": email, "smtp_host": host, "smtp_port": port,
                             "smtp_user": user, "smtp_password": password, "policy": policy,
@@ -301,16 +302,53 @@ def send_report(cfg, subject, body):
             smtp.send_message(msg)
 
 
+def _installed_version():
+    try:
+        return package_version("lksu")
+    except PackageNotFoundError:
+        return "unknown"
+
+
+def _active_status(cfg):
+    timer = core.run("systemctl", "is-active", "lksu-maintenance.timer", check=False)
+    enabled = core.run("systemctl", "is-enabled", "lksu-maintenance.timer", check=False)
+    running = timer.returncode == 0 and timer.stdout.strip() == "active"
+    scheduled = enabled.returncode == 0 and enabled.stdout.strip() in {"enabled", "enabled-runtime"}
+    return {
+        "version": _installed_version(),
+        "timer_active": running,
+        "timer_enabled": scheduled,
+        "automatic_updates": bool(cfg.get("automatic_updates", False)),
+        "automatic_reboot": bool(cfg.get("automatic_reboot", False)),
+        "self_update": bool(cfg.get("automatic_lksu_updates", False)),
+        "report_language": cfg.get("report_language", "en"),
+    }
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="AlmaLinux Kernel Security Updater")
+    parser.add_argument("--version", action="version", version="LKSU " + _installed_version())
     parser.add_argument("--json", action="store_true", help="Print the full machine-readable report instead of an operator summary")
-    parser.add_argument("command", choices=("compatibility", "kernel-inventory", "configure", "configure-automation", "configure-self-update", "configure-language", "initialize", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check", "self-update", "self-update-check", "self-update-scheduled"))
+    parser.add_argument("command", choices=("active", "compatibility", "kernel-inventory", "configure", "configure-automation", "configure-self-update", "configure-language", "initialize", "check", "scheduled", "apply", "maintenance", "stage-reboot", "verify", "select-old", "security-baseline", "security-check", "self-update", "self-update-check", "self-update-scheduled"))
     args = parser.parse_args(argv)
     reboot_requested = False
     mail_failure = None
     report_attempted = False
     cfg = None
     try:
+        if args.command == "active":
+            cfg = core.config()
+            _set_ui_language(cfg.get("report_language", "en"))
+            status = _active_status(cfg)
+            if args.json:
+                print(json.dumps(status, indent=2))
+            else:
+                healthy = status["timer_active"] and status["timer_enabled"]
+                title = ("ETKİN" if healthy else "ETKİN DEĞİL") if _UI_LANG == "tr" else ("ACTIVE" if healthy else "INACTIVE")
+                print(f"LKSU v{status['version']}: {title}")
+                for key, label in [("timer_active", "Zamanlayıcı çalışıyor" if _UI_LANG == "tr" else "Timer active"), ("timer_enabled", "Zamanlayıcı etkin" if _UI_LANG == "tr" else "Timer enabled"), ("automatic_updates", "Otomatik kernel güncellemeleri" if _UI_LANG == "tr" else "Automatic kernel updates"), ("automatic_reboot", "Otomatik yeniden başlatma (güvenlik koşullu)" if _UI_LANG == "tr" else "Automatic reboot (guarded)"), ("self_update", "LKSU otomatik güncelleme" if _UI_LANG == "tr" else "LKSU self-update")]:
+                    print(f"{label}: {('Evet' if status[key] else 'Hayır') if _UI_LANG == 'tr' else ('Yes' if status[key] else 'No')}")
+            return 0
         if args.command == "compatibility":
             from .distributions import detect
             assessment = detect().as_dict()
@@ -321,13 +359,21 @@ def main(argv=None):
                     print(f"{key.replace('_', ' ').capitalize()}: {value}")
             return 0
         if args.command == "kernel-inventory":
+            try:
+                _set_ui_language(core.config().get("report_language", "en"))
+            except (core.LKSUError, OSError, ValueError):
+                _set_ui_language("en")
             from .kernel_inventory import inventory
             assessment = inventory()
             if args.json:
                 print(json.dumps(assessment, indent=2))
             else:
+                labels = {"distribution": "Dağıtım", "version": "Sürüm", "running_kernel": "Çalışan kernel", "installed_kernel_packages": "Kurulu kernel paketleri", "automatic_updates": "Otomatik güncellemeler", "automatic_reboot": "Otomatik yeniden başlatma", "note": "Not"}
                 for key, value in assessment.items():
-                    print(f"{key.replace('_', ' ').capitalize()}: {value}")
+                    label = labels.get(key, key.replace("_", " ").capitalize()) if _UI_LANG == "tr" else key.replace("_", " ").capitalize()
+                    if _UI_LANG == "tr" and value == "configured-separately":
+                        value = "Ayrı yapılandırılır (lksu check)"
+                    print(f"{label}: {value}")
             return 0
         if args.command == "configure":
             setup()
@@ -396,7 +442,7 @@ def main(argv=None):
             notifications.send_event(cfg, args.command, result, send_report, build_email_report)
         except (core.LKSUError, OSError, ValueError, KeyError, smtplib.SMTPException) as mail_error:
             mail_failure = mail_error
-            print(f"LKSU event email delivery failed: {mail_error}", file=sys.stderr)
+            print(("LKSU olay e-postası gönderilemedi: " if _UI_LANG == "tr" else "LKSU event email delivery failed: ") + str(mail_error), file=sys.stderr)
         if routine_reports or args.command == "security-check":
             send_fleet_report(cfg, {"command": args.command, "result": result, "hostname": os.uname().nodename, "reported_at": int(datetime.now().timestamp())})
         if reboot_requested:
@@ -413,14 +459,14 @@ def main(argv=None):
             return 1
         return 0 if not (args.command == "verify" and not result["healthy"]) else 2
     except (core.LKSUError, OSError, ValueError, KeyError, smtplib.SMTPException) as exc:
-        print(f"LKSU error: {exc}", file=sys.stderr)
+        print(("LKSU hatası: " if _UI_LANG == "tr" else "LKSU error: ") + str(exc), file=sys.stderr)
         # Report failed scheduled actions too, without retrying a failed SMTP send.
         if cfg is not None and not report_attempted and args.command in notifications.UPDATE_COMMANDS:
             try:
                 notifications.send_event(cfg, args.command, {"status": "error", "error": str(exc)},
                                          send_report, build_email_report)
             except (core.LKSUError, OSError, ValueError, KeyError, smtplib.SMTPException) as mail_error:
-                print(f"LKSU report delivery failed: {mail_error}", file=sys.stderr)
+                print(("LKSU rapor e-postası gönderilemedi: " if _UI_LANG == "tr" else "LKSU report delivery failed: ") + str(mail_error), file=sys.stderr)
         return 1
 
 
