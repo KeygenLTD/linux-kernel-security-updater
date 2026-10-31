@@ -115,7 +115,7 @@ def _localize_report(cfg, subject, body):
         return subject, body
     for english, turkish in _TR.items():
         subject = subject.replace("[" + english + "]", "[" + turkish + "]")
-    return subject, "\\n".join(_translate_line(line) for line in body.split("\\n"))
+    return subject, "\n".join(_translate_line(line) for line in body.split("\n"))
 
 def _os_name():
     try:
