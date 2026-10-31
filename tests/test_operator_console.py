@@ -304,8 +304,8 @@ class StatusCommandTests(unittest.TestCase):
     def test_active_reads_real_timer_and_shows_turkish(self, run, config):
         from types import SimpleNamespace
         run.side_effect = [
-            SimpleNamespace(returncode=0, stdout="active\\n"),
-            SimpleNamespace(returncode=0, stdout="enabled\\n"),
+            SimpleNamespace(returncode=0, stdout="active\n"),
+            SimpleNamespace(returncode=0, stdout="enabled\n"),
         ]
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer):
@@ -318,8 +318,8 @@ class StatusCommandTests(unittest.TestCase):
     def test_active_json_keeps_machine_keys(self, run, config):
         from types import SimpleNamespace
         run.side_effect = [
-            SimpleNamespace(returncode=0, stdout="inactive\\n"),
-            SimpleNamespace(returncode=1, stdout="disabled\\n"),
+            SimpleNamespace(returncode=0, stdout="inactive\n"),
+            SimpleNamespace(returncode=1, stdout="disabled\n"),
         ]
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer):
