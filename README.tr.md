@@ -16,6 +16,7 @@
 ![Sürüm](https://img.shields.io/badge/geliştirme-0.3.23.dev0-blue)
 ![AlmaLinux](https://img.shields.io/badge/AlmaLinux-8%20%7C%209%20%7C%2010-168B4C)
 ![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB)
+[![Unit tests](https://github.com/KeygenLTD/linux-kernel-security-updater/actions/workflows/tests.yml/badge.svg?branch=fix%2Fstatus-maintenance-timer-20261031)](https://github.com/KeygenLTD/linux-kernel-security-updater/actions/workflows/tests.yml)
 [![Issues](https://img.shields.io/github/issues/KeygenLTD/linux-kernel-security-updater)](https://github.com/KeygenLTD/linux-kernel-security-updater/issues)
 
 </div>
@@ -165,3 +166,7 @@ flowchart TD
 `sudo lksu configure-automation` ile izinleri inceleyin. Snapshot/konsol onayı, sağlık kontrolleri veya doğrulama servisi şartları sağlanmadıysa yeniden başlatma güvenlik nedeniyle engellenebilir.
 
 </details>
+
+## 🎬 Gerçek terminal gösterimi
+
+LKSU'nun gerçek komut çıktılarıyla hazırlanmış kayıt henüz yayınlanmadı. Sahte terminal animasyonu kullanmıyoruz. Güvenli test VM'sinde kayıt alma ve hassas bilgileri temizleme adımları için [terminal kayıt rehberini](docs/terminal-recording.md) inceleyin.
