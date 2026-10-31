@@ -8,6 +8,115 @@ from pathlib import Path
 from . import core
 
 
+
+# Translation is applied only to presentation; kernel IDs, service names,
+# errors, advisory identifiers and machine-readable JSON remain unchanged.
+_TR = {
+    "Summary": "Özet", "Server": "Sunucu", "Update assessment": "Güncelleme değerlendirmesi",
+    "Scheduling": "Zamanlama", "Old kernel cleanup": "Eski kernel temizliği",
+    "Available kernel packages": "Mevcut kernel paketleri",
+    "Security advisories": "Güvenlik duyuruları",
+    "LKSU application": "LKSU uygulaması",
+    "Reboot safety block": "Yeniden başlatma güvenlik engeli",
+    "Failure details": "Hata ayrıntıları",
+    "Post-boot health checks": "Açılış sonrası sağlık kontrolleri",
+    "Security findings": "Güvenlik bulguları",
+    "Result": "Sonuç", "Operation": "İşlem", "Details": "Ayrıntılar",
+    "Action required": "Gerekli işlem", "Hostname": "Sunucu adı",
+    "Operating system": "İşletim sistemi", "Report time": "Rapor zamanı",
+    "Running kernel": "Çalışan kernel", "Installed kernels": "Kurulu kerneller",
+    "Default kernel": "Varsayılan kernel", "Boot status": "Açılış durumu",
+    "Reboot required": "Yeniden başlatma gerekli",
+    "Reboot target": "Yeniden başlatma hedefi", "Rollback kernel": "Geri dönüş kerneli",
+    "Kernel package upgrades": "Kernel paket güncellemeleri",
+    "Security advisories": "Güvenlik duyuruları",
+    "Advisory applicability": "Duyuru geçerliliği",
+    "Install policy": "Kurulum politikası",
+    "Automatic installation": "Otomatik kurulum",
+    "Automatic reboot": "Otomatik yeniden başlatma",
+    "Recovery readiness approval": "Kurtarma hazırlığı onayı",
+    "Automatic LKSU application updates": "Otomatik LKSU güncellemeleri",
+    "Kernel check interval": "Kernel kontrol aralığı",
+    "Automatic kernel installation": "Otomatik kernel kurulumu",
+    "Unattended reboot": "Gözetimsiz yeniden başlatma",
+    "Next scheduled check": "Sonraki zamanlanmış kontrol",
+    "Installed application version": "Kurulu uygulama sürümü",
+    "Available release": "Mevcut sürüm",
+    "Advisory warning": "Duyuru uyarısı",
+    "Host": "Sunucu", "Status": "Durum", "Next boot kernel": "Sonraki açılış kerneli",
+    "Package upgrades": "Paket güncellemeleri", "Advisories": "Duyurular",
+    "LKSU installed": "Kurulu LKSU", "Latest release": "Son sürüm",
+    "Kernel updates": "Kernel güncellemeleri", "Kernel checks": "Kernel kontrolleri",
+    "LKSU self-update": "LKSU otomatik güncelleme",
+    "Old kernels cleaned": "Temizlenen eski kerneller",
+    "Reboot blocked": "Yeniden başlatma engellendi",
+    "Error": "Hata", "Next action": "Sonraki işlem",
+    "Full technical details": "Tüm teknik ayrıntılar",
+    "VERIFIED": "DOĞRULANDI", "NO UPDATES": "GÜNCELLEME YOK",
+    "NO SECURITY UPDATES": "GÜVENLİK GÜNCELLEMESİ YOK",
+    "ERROR": "HATA", "ACTION REQUIRED": "İŞLEM GEREKLİ",
+    "REBOOT BLOCKED": "YENİDEN BAŞLATMA ENGELLENDİ",
+    "REBOOT REQUIRED": "YENİDEN BAŞLATMA GEREKLİ",
+    "REBOOT PENDING": "YENİDEN BAŞLATMA BEKLENİYOR",
+    "TRIAL BOOT STAGED": "DENEME AÇILIŞI HAZIR",
+    "LKSU UPDATED": "LKSU GÜNCELLENDİ",
+    "ALREADY INITIALIZED": "ZATEN BAŞLATILDI",
+    "CHECK ONLY": "YALNIZCA KONTROL",
+    "NOT REQUIRED": "GEREKMİYOR", "VERIFICATION PENDING": "DOĞRULAMA BEKLENİYOR",
+    "COMPLETED": "TAMAMLANDI", "SECURITY ALERT": "GÜVENLİK UYARISI",
+    "Enabled": "Etkin", "Disabled": "Devre dışı", "Not checked": "Kontrol edilmedi",
+    "Not available": "Mevcut değil", "Not determined": "Belirlenmedi",
+    "Not established": "Belirlenmedi", "Yes": "Evet", "No": "Hayır",
+    "PASS": "BAŞARILI", "FAIL": "BAŞARISIZ",
+}
+_TR_PHRASES = {
+    "Post-boot service and kernel verification passed.": "Açılış sonrası servis ve kernel doğrulaması başarılı.",
+    "No immediate action indicated.": "Şu anda işlem gerekmiyor.",
+    "No kernel package upgrades found in enabled repositories.": "Etkin depolarda kernel güncellemesi bulunamadı.",
+    "Kernel packages installed; the running kernel has not yet been verified after reboot.": "Kernel paketleri kuruldu; yeniden başlatma sonrası doğrulama bekleniyor.",
+    "Post-boot verification failed; the update remains pending.": "Açılış sonrası doğrulama başarısız; güncelleme beklemede.",
+    "Command failed; results must not be treated as a successful check.": "Komut başarısız; sonuçlar başarılı kontrol olarak değerlendirilmemeli.",
+    "Yes - investigate the error shown below.": "Evet - aşağıdaki hatayı inceleyin.",
+    "Yes - investigate failed checks and confirm console access before any rollback.": "Evet - başarısız kontrolleri inceleyin ve geri dönüş öncesinde konsol erişimini doğrulayın.",
+    "No previous kernel recorded by LKSU; provider snapshot not checked": "LKSU önceki kernel kaydetmemiş; sağlayıcı snapshot'ı kontrol edilmedi",
+    "Unknown (saved update state could not be read)": "Bilinmiyor (kayıtlı güncelleme durumu okunamadı)",
+    "Unknown (invalid saved kernel identifier)": "Bilinmiyor (geçersiz kayıtlı kernel kimliği)",
+    "None found": "Bulunamadı", "Not configured": "Yapılandırılmadı",
+    "Confirmed by operator": "Operatör tarafından onaylandı",
+    "Not confirmed": "Onaylanmadı",
+    "Every 15 minutes (24/7, when timer is enabled)": "Her 15 dakikada (zamanlayıcı etkinken 7/24)",
+    "Every 15 minutes (24/7 timer)": "Her 15 dakikada (7/24)",
+    "Requires automatic_updates and eligible policy": "automatic_updates ve uygun kurulum politikası gerektirir",
+    "Requires opt-in and passing recovery/health checks": "Onay ve başarılı kurtarma/sağlık kontrolleri gerektirir",
+    "Not determined here; inspect systemctl list-timers on the host.": "Burada belirlenmedi; sunucuda systemctl list-timers komutunu inceleyin.",
+    "Not confirmed by this count alone": "Yalnızca bu sayı ile doğrulanamaz",
+    "Important: A preserved kernel is not a VM snapshot or a proven rollback. Confirm provider-console recovery before reboot.": "Önemli: Korunan kernel VM snapshot'ı veya doğrulanmış geri dönüş değildir. Yeniden başlatmadan önce sağlayıcı konsolundan kurtarmayı doğrulayın.",
+}
+def _translate_line(line):
+    if line in _TR_PHRASES:
+        return _TR_PHRASES[line]
+    if line in _TR:
+        return _TR[line]
+    if ":" in line:
+        head, tail = line.split(":", 1)
+        key = head.strip()
+        if key in _TR:
+            tail = tail.strip()
+            tail = _TR_PHRASES.get(tail, _TR.get(tail, tail))
+            return _TR[key] + ": " + tail
+    return line
+
+
+def _localize_report(cfg, subject, body):
+    language = cfg.get("report_language", "en")
+    if language not in {"tr", "en"}:
+        raise core.LKSUError("Invalid report_language; expected tr or en")
+    if language == "en":
+        return subject, body
+    for english, turkish in _TR.items():
+        subject = subject.replace("[" + english + "]", "[" + turkish + "]")
+    return subject, "\\n".join(_translate_line(line) for line in body.split("\\n"))
+
 def _os_name():
     try:
         for line in Path("/etc/os-release").read_text().splitlines():
@@ -209,7 +318,7 @@ def build_email_report(cfg, command, result, *, timestamp=None, hostname=None, o
                 lines.append("- {} [{}]: {}".format(alert.get("code", "?"), alert.get("severity", "?"), str(alert.get("message", ""))[:200]))
     lines.extend(["", "Important: A preserved kernel is not a VM snapshot or a proven rollback. Confirm provider-console recovery before reboot.", ""])
     subject = "LKSU [{}] {} | {}".format(level, hostname, command)
-    return subject, "\n".join(lines)
+    return _localize_report(cfg, subject, "\n".join(lines))
 
 
 def format_console_report(cfg, command, result):
