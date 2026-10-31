@@ -130,7 +130,7 @@ class InitialInstallTests(unittest.TestCase):
     })
     def test_failed_reboot_request_is_visible(self, cfg, fleet, run, initial, lock):
         stdout, stderr = io.StringIO(), io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        with patch("lksu.progress._language", return_value="en"), contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             self.assertEqual(cli.main(["initialize"]), 1)
         self.assertIn("Requesting system reboot NOW", stderr.getvalue())
         self.assertIn("Reboot request failed", stderr.getvalue())
