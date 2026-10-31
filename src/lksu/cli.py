@@ -17,14 +17,69 @@ from . import self_update, notifications
 from .progress import event
 
 
+
+_TR_UI = {
+  "Report email: ": "Rapor e-posta adresi: ",
+  "Mail provider [postmark/smtp2go/custom] (default postmark): ": "E-posta sağlayıcısı [postmark/smtp2go/custom] (varsayılan postmark): ",
+  "Postmark Server Token: ": "Postmark sunucu anahtarı: ",
+  "SMTP2GO username: ": "SMTP2GO kullanıcı adı: ",
+  "SMTP2GO password: ": "SMTP2GO parolası: ",
+  "SMTP host: ": "SMTP sunucusu: ",
+  "SMTP port [465]: ": "SMTP portu [465]: ",
+  "SMTP username: ": "SMTP kullanıcı adı: ",
+  "SMTP password or app password: ": "SMTP parolası veya uygulama parolası: ",
+  "Install available kernel updates on setup and automatically thereafter?": "Kurulumda ve sonrasında kernel güncellemeleri otomatik kurulsun mu?",
+  "Automatically install verified LKSU releases?": "Doğrulanmış LKSU sürümleri otomatik kurulsun mu?",
+  "Email only when updates succeed or fail?": "Yalnızca güncelleme başarılı veya başarısız olduğunda e-posta gönderilsin mi?",
+  "Automatically reboot after installing a kernel when recovery checks pass?": "Kurtarma kontrolleri başarılıysa kernel kurulumundan sonra otomatik yeniden başlatılsın mı?",
+  "Services to verify after reboot (comma-separated; Enter to detect running apps): ": "Yeniden başlatma sonrası kontrol edilecek servisler (virgülle ayırın; çalışanları algılamak için Enter): ",
+  "HTTP/HTTPS health URLs (comma separated, optional): ": "HTTP/HTTPS sağlık kontrolü adresleri (virgülle ayırın, isteğe bağlı): ",
+  "Automatically install kernel updates?": "Kernel güncellemeleri otomatik kurulsun mu?",
+  "Automatically reboot after eligible kernel updates?": "Uygun kernel güncellemelerinden sonra otomatik yeniden başlatılsın mı?",
+  "Kernel install policy [security-only/all-stable] (default all-stable): ": "Kernel kurulum politikası [security-only/all-stable] (varsayılan all-stable): ",
+  "Services to check before and after reboot (comma separated, Enter to keep suggestions; 'none' for URL-only): ": "Yeniden başlatma öncesi ve sonrası kontrol edilecek servisler (virgülle ayırın; öneriler için Enter; yalnızca URL için 'none'): ",
+  "Have you verified a current external snapshot AND provider console recovery?": "Güncel harici snapshot VE sağlayıcı konsolundan kurtarmayı doğruladınız mı?",
+  "Have you verified an external snapshot AND provider console recovery?": "Harici snapshot VE sağlayıcı konsolundan kurtarmayı doğruladınız mı?",
+  "Automatically install verified LKSU application releases? [Y/n]: ": "Doğrulanmış LKSU sürümleri otomatik kurulsun mu? [E/h]: ",
+  "Root required": "Root yetkisi gerekli",
+  "Invalid email address": "Geçersiz e-posta adresi",
+  "Invalid mail provider": "Geçersiz e-posta sağlayıcısı",
+  "Invalid mail configuration": "Geçersiz e-posta yapılandırması",
+  "Invalid install policy": "Geçersiz kurulum politikası",
+  "Invalid service name": "Geçersiz servis adı",
+  "Answer y or n": "Evet için e, hayır için h girin",
+  "Automatic reboot is blocked until recovery readiness is confirmed.": "Kurtarma hazırlığı doğrulanana kadar otomatik yeniden başlatma engellenir.",
+  "Kernel automation preferences saved; SMTP and recovery settings preserved.": "Kernel otomasyon tercihleri kaydedildi; SMTP ve kurtarma ayarları korundu.",
+  "24/7 kernel checks: every 15 minutes. Install and guarded reboot require their configured opt-ins.": "Kernel kontrolleri 7/24 her 15 dakikada yapılır. Kurulum ve korumalı yeniden başlatma için izin gerekir.",
+  "Enabled": "Etkin",
+  "Disabled": "Devre dışı",
+  "Current reboot health checks: ": "Mevcut yeniden başlatma sağlık kontrolleri: ",
+  "Configured reboot health checks: ": "Yapılandırılan yeniden başlatma sağlık kontrolleri: ",
+  "Detected running application services: ": "Algılanan çalışan uygulama servisleri: ",
+  "Selected running application health checks: ": "Seçilen çalışan uygulama sağlık kontrolleri: "
+}
+_UI_LANG = 'en'
+def _ui(message):
+    return _TR_UI.get(message, message) if _UI_LANG == 'tr' else message
+
+def _ui_input(message):
+    return input(_ui(message))
+
+def _ui_error(message):
+    return core.LKSUError(_ui(message))
+
+def _set_ui_language(value):
+    global _UI_LANG
+    _UI_LANG = value if value in ('tr', 'en') else 'en'
+
 def yes_no(prompt, default):
-    suffix = "Y/n" if default else "y/N"
-    value = input(f"{prompt} [{suffix}]: ").strip().lower()
+    suffix = ("E/h" if default else "e/H") if _UI_LANG == "tr" else ("Y/n" if default else "y/N")
+    value = input(f"{_ui(prompt)} [{suffix}]: ").strip().lower()
     if not value:
         return default
-    if value not in {"y", "yes", "n", "no"}:
-        raise core.LKSUError("Answer y or n")
-    return value in {"y", "yes"}
+    if value not in {"y", "yes", "n", "no", "e", "evet", "h", "hayır", "hayir"}:
+        raise _ui_error("Answer y or n")
+    return value in {"y", "yes", "e", "evet"}
 
 
 def detect_active_host_services():
@@ -81,14 +136,14 @@ def choose_report_language(current="tr"):
     """Choose report language; invalid answers never change saved configuration."""
     value = input(("Rapor ve arayüz dili [tr/en] (varsayılan {}): " if current == "tr" else "Report and interface language [tr/en] (default {}): ").format(current)).strip().lower() or current
     if value not in {"tr", "en"}:
-        raise core.LKSUError("Dil tr veya en olmalıdır / Language must be tr or en")
+        raise _ui_error("Dil tr veya en olmalıdır / Language must be tr or en")
     return value
 
 
 def configure_language():
     """Change report language on an existing host without touching SMTP or automation."""
     if os.geteuid():
-        raise core.LKSUError("Root required")
+        raise _ui_error("Root required")
     cfg = core.config()
     cfg["report_language"] = choose_report_language(cfg.get("report_language", "en"))
     core.save(core.CONFIG, cfg)
@@ -97,52 +152,53 @@ def configure_language():
 
 def setup():
     if os.geteuid():
-        raise core.LKSUError("Root required")
+        raise _ui_error("Root required")
     core.os_version()
     report_language = choose_report_language("tr")
-    email = input("Report email: ").strip()
+    _set_ui_language(report_language)
+    email = _ui_input("Report email: ").strip()
     if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
-        raise core.LKSUError("Invalid email address")
-    provider = input("Mail provider [postmark/smtp2go/custom] (default postmark): ").strip().lower() or "postmark"
+        raise _ui_error("Invalid email address")
+    provider = _ui_input("Mail provider [postmark/smtp2go/custom] (default postmark): ").strip().lower() or "postmark"
     if provider == "postmark":
         host, port = "smtp.postmarkapp.com", 587
-        token = getpass.getpass("Postmark Server Token: ")
+        token = getpass.getpass(_ui("Postmark Server Token: "))
         user = password = token
     elif provider == "smtp2go":
         host, port = "mail.smtp2go.com", 587
-        user = input("SMTP2GO username: ").strip()
-        password = getpass.getpass("SMTP2GO password: ")
+        user = _ui_input("SMTP2GO username: ").strip()
+        password = getpass.getpass(_ui("SMTP2GO password: "))
     elif provider == "custom":
-        host = input("SMTP host: ").strip()
-        port = int(input("SMTP port [465]: ").strip() or "465")
-        user = input("SMTP username: ").strip()
-        password = getpass.getpass("SMTP password or app password: ")
+        host = _ui_input("SMTP host: ").strip()
+        port = int(_ui_input("SMTP port [465]: ").strip() or "465")
+        user = _ui_input("SMTP username: ").strip()
+        password = getpass.getpass(_ui("SMTP password or app password: "))
     else:
-        raise core.LKSUError("Invalid mail provider")
+        raise _ui_error("Invalid mail provider")
     if not user or not password or not re.fullmatch(r"[A-Za-z0-9.-]+", host):
-        raise core.LKSUError("Invalid mail configuration")
+        raise _ui_error("Invalid mail configuration")
     automatic_updates = yes_no("Install available kernel updates on setup and automatically thereafter?", True)
     automatic_lksu_updates = yes_no("Automatically install verified LKSU releases?", True)
     notify_events = yes_no("Email only when updates succeed or fail?", True)
     automatic_reboot = yes_no("Automatically reboot after installing a kernel when recovery checks pass?", True)
     default_policy = "all-stable" if automatic_updates else "check-only"
-    policy = input(
+    policy = _ui_input(
         f"Install policy [check-only/security-only/all-stable] (default {default_policy}): "
     ).strip() or default_policy
     if automatic_updates and policy == "check-only":
-        raise core.LKSUError("Automatic kernel installation requires security-only or all-stable")
+        raise _ui_error("Automatic kernel installation requires security-only or all-stable")
     if policy not in {"check-only", "security-only", "all-stable"}:
-        raise core.LKSUError("Invalid install policy")
-    services = input("Services to verify after reboot (comma-separated; Enter to detect running apps): ").strip()
+        raise _ui_error("Invalid install policy")
+    services = _ui_input("Services to verify after reboot (comma-separated; Enter to detect running apps): ").strip()
     parsed = [x.strip() for x in services.split(",") if x.strip()]
     if any(not re.fullmatch(r"[A-Za-z0-9_.@-]+", x) for x in parsed):
-        raise core.LKSUError("Invalid service name")
-    health_urls = input("HTTP/HTTPS health URLs (comma separated, optional): ").strip()
+        raise _ui_error("Invalid service name")
+    health_urls = _ui_input("HTTP/HTTPS health URLs (comma separated, optional): ").strip()
     parsed_urls = [{"url": x.strip(), "status": 200} for x in health_urls.split(",") if x.strip()]
     if automatic_reboot and not parsed and not parsed_urls:
         parsed = detect_active_host_services()
         if parsed:
-            print("Selected running application health checks: " + ", ".join(parsed))
+            print(_ui("Selected running application health checks: ") + ", ".join(parsed))
     if automatic_reboot:
         validate_reboot_health_checks(parsed, parsed_urls)
     recovery_ready = False
@@ -166,27 +222,28 @@ def setup():
 def configure_automation():
     """Change kernel automation without overwriting SMTP or unrelated config."""
     if os.geteuid():
-        raise core.LKSUError("Root required")
+        raise _ui_error("Root required")
     cfg = core.config()
+    _set_ui_language(cfg.get("report_language", "en"))
     update = yes_no("Automatically install kernel updates?", cfg.get("automatic_updates", False))
     reboot = yes_no("Automatically reboot after eligible kernel updates?", cfg.get("automatic_reboot", False))
     cfg["automatic_updates"] = update
     cfg["automatic_reboot"] = reboot
     cfg.pop("maintenance_window", None)  # Never reintroduce legacy scheduling restrictions.
     if update and cfg.get("policy") == "check-only":
-        policy = input("Kernel install policy [security-only/all-stable] (default all-stable): ").strip() or "all-stable"
+        policy = _ui_input("Kernel install policy [security-only/all-stable] (default all-stable): ").strip() or "all-stable"
         if policy not in {"security-only", "all-stable"}:
-            raise core.LKSUError("Invalid install policy")
+            raise _ui_error("Invalid install policy")
         cfg["policy"] = policy
     if reboot:
         current_services = list(cfg.get("services") or [])
         if current_services:
-            print("Current reboot health checks: " + ", ".join(current_services))
+            print(_ui("Current reboot health checks: ") + ", ".join(current_services))
             defaults = current_services
         else:
             defaults = detect_active_host_services()
-            print("Detected running application services: " + (", ".join(defaults) if defaults else "none"))
-        names = input(
+            print(_ui("Detected running application services: ") + (", ".join(defaults) if defaults else "none"))
+        names = _ui_input(
             "Services to check before and after reboot (comma separated, Enter to keep suggestions; 'none' for URL-only): "
         ).strip()
         parsed = (
@@ -194,10 +251,10 @@ def configure_automation():
             [x.strip() for x in names.split(",") if x.strip()] if names else defaults
         )
         if any(not re.fullmatch(r"[A-Za-z0-9_.@-]+", x) for x in parsed):
-            raise core.LKSUError("Invalid service name")
+            raise _ui_error("Invalid service name")
         cfg["services"] = parsed
         if parsed:
-            print("Configured reboot health checks: " + ", ".join(parsed))
+            print(_ui("Configured reboot health checks: ") + ", ".join(parsed))
         validate_reboot_health_checks(cfg.get("services"), cfg.get("health_urls"))
         cfg["recovery_ready"] = yes_no(
             "Have you verified a current external snapshot AND provider console recovery?",
@@ -207,23 +264,24 @@ def configure_automation():
         cfg["recovery_ready"] = False
     core.save(core.CONFIG, cfg)
     core.run("systemctl", "enable", "--now", "lksu-maintenance.timer")
-    print("Kernel automation preferences saved; SMTP and recovery settings preserved.")
-    print("24/7 kernel checks: every 15 minutes. Install and guarded reboot require their configured opt-ins.")
+    print(_ui("Kernel automation preferences saved; SMTP and recovery settings preserved."))
+    print(_ui("24/7 kernel checks: every 15 minutes. Install and guarded reboot require their configured opt-ins."))
 
 
 
 def configure_self_update():
     """Explicit one-time opt-in for an existing configuration, without resetting SMTP."""
     if os.geteuid():
-        raise core.LKSUError("Root required")
+        raise _ui_error("Root required")
     cfg = core.config()
-    answer = input("Automatically install verified LKSU application releases? [Y/n]: ").strip().lower()
+    _set_ui_language(cfg.get("report_language", "en"))
+    answer = _ui_input("Automatically install verified LKSU application releases? [Y/n]: ").strip().lower()
     if answer not in {"", "y", "yes", "n", "no"}:
-        raise core.LKSUError("Answer y or n")
+        raise _ui_error("Answer y or n")
     enabled = answer in {"", "y", "yes"}
     cfg["automatic_lksu_updates"] = enabled
     core.save(core.CONFIG, cfg)
-    print("Automatic LKSU application updates: " + ("Enabled" if enabled else "Disabled"))
+    print(_ui("Automatic LKSU application updates: ") + _ui("Enabled" if enabled else "Disabled"))
 
 
 def send_report(cfg, subject, body):
@@ -287,6 +345,7 @@ def main(argv=None):
             configure_automation()
             return 0
         cfg = core.config()
+        _set_ui_language(cfg.get("report_language", "en"))
         if args.command == "initialize":
             with core.kernel_operation_lock():
                 result, reboot_requested = core.initial_run(cfg)
@@ -296,16 +355,16 @@ def main(argv=None):
             result = self_update.update(automatic=args.command == "self-update-scheduled",
                                         enabled=cfg.get("automatic_lksu_updates", False))
         elif args.command == "security-baseline":
-            if os.geteuid(): raise core.LKSUError("Root required")
+            if os.geteuid(): raise _ui_error("Root required")
             result = {"status": "baseline-created", "baseline": create_baseline(cfg)}
         elif args.command == "security-check":
-            if os.geteuid(): raise core.LKSUError("Root required")
+            if os.geteuid(): raise _ui_error("Root required")
             result = security_check(cfg)
         elif args.command == "check":
             result = core.check()
         elif args.command == "apply":
             if os.geteuid():
-                raise core.LKSUError("Root required")
+                raise _ui_error("Root required")
             with core.kernel_operation_lock():
                 result = core.apply(cfg["policy"])
         elif args.command == "scheduled":
@@ -325,7 +384,7 @@ def main(argv=None):
                 result = core.verify(cfg)
         else:
             if os.geteuid():
-                raise core.LKSUError("Root required")
+                raise _ui_error("Root required")
             with core.kernel_operation_lock():
                 result = {"old_default": core.select_old(), "rebooted": False}
         if args.json:
