@@ -275,10 +275,7 @@ def configure_self_update():
         raise _ui_error("Root required")
     cfg = core.config()
     _set_ui_language(cfg.get("report_language", "en"))
-    answer = _ui_input("Automatically install verified LKSU application releases? [Y/n]: ").strip().lower()
-    if answer not in {"", "y", "yes", "n", "no"}:
-        raise _ui_error("Answer y or n")
-    enabled = answer in {"", "y", "yes"}
+    enabled = yes_no("Automatically install verified LKSU releases?", True)
     cfg["automatic_lksu_updates"] = enabled
     core.save(core.CONFIG, cfg)
     print(_ui("Automatic LKSU application updates: ") + _ui("Enabled" if enabled else "Disabled"))
