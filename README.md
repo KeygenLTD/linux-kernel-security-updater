@@ -16,6 +16,7 @@
 ![Version](https://img.shields.io/badge/development-0.3.23.dev0-blue)
 ![AlmaLinux](https://img.shields.io/badge/AlmaLinux-8%20%7C%209%20%7C%2010-168B4C)
 ![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB)
+[![Unit tests](https://github.com/KeygenLTD/linux-kernel-security-updater/actions/workflows/tests.yml/badge.svg?branch=fix%2Fstatus-maintenance-timer-20261031)](https://github.com/KeygenLTD/linux-kernel-security-updater/actions/workflows/tests.yml)
 [![Issues](https://img.shields.io/github/issues/KeygenLTD/linux-kernel-security-updater)](https://github.com/KeygenLTD/linux-kernel-security-updater/issues)
 
 </div>
@@ -165,3 +166,7 @@ Check `lksu active`, `lksu check --json` and `lksu compatibility --json`. Confir
 Review `sudo lksu configure-automation`. Reboot can be blocked by missing snapshot/console confirmation, health checks or verification service readiness.
 
 </details>
+
+## 🎬 Real terminal walkthrough
+
+A verified screen recording of real LKSU commands has not been published yet. We do not use simulated terminal footage. See the [recording guide](docs/terminal-recording.md) for safe VM capture and redaction requirements.
