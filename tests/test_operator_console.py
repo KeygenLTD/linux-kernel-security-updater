@@ -87,6 +87,7 @@ class ConsoleTests(unittest.TestCase):
         self, prompt, _token, _root, _os, save
     ):
         prompt.side_effect = lambda label: (
+            "en" if "language [tr/en]" in label else
             "operator@example.com" if label == "Report email: " else
             "lsws" if label.startswith("Services to verify after reboot") else ""
         )
