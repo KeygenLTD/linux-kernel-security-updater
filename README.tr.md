@@ -16,7 +16,7 @@
 ![Sürüm](https://img.shields.io/badge/geliştirme-0.3.23.dev0-blue)
 ![AlmaLinux](https://img.shields.io/badge/AlmaLinux-8%20%7C%209%20%7C%2010-168B4C)
 ![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB)
-[![Unit tests](https://github.com/KeygenLTD/linux-kernel-security-updater/actions/workflows/tests.yml/badge.svg?branch=fix%2Fstatus-maintenance-timer-20261031)](https://github.com/KeygenLTD/linux-kernel-security-updater/actions/workflows/tests.yml)
+[![Unit tests](https://github.com/KeygenLTD/linux-kernel-security-updater/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/KeygenLTD/linux-kernel-security-updater/actions/workflows/tests.yml)
 [![Issues](https://img.shields.io/github/issues/KeygenLTD/linux-kernel-security-updater)](https://github.com/KeygenLTD/linux-kernel-security-updater/issues)
 
 </div>
@@ -24,7 +24,7 @@
 
 ## 🧭 İçindekiler
 
-[Kurulum](#kurulum) · [Destek](#hangi-sistemlerde-çalışır) · [SSS](#-sık-sorulan-sorular) · [Mimari](docs/architecture.md) · [Kurtarma](docs/recovery.md) · [CVE](docs/cve-security.md)
+[Kurulum](#kurulum) · [Destek](#hangi-sistemlerde-çalışır) · [SSS](#-sık-sorulan-sorular) · [Mimari](docs/architecture.md) · [Kurtarma](docs/recovery.md) · [CVE](docs/cve-security.md) · [📧 SMTP](docs/email-smtp.tr.md)
 
 > [!TIP]
 > Ayrıntılı teknik belgeler ayrı sayfalarda tutulur; burası hızlı başlangıç rehberidir.
@@ -64,6 +64,12 @@ Kurulum seçenekleri **gerçek kernel kurulumu ve yeniden başlatma** yetkisi ve
 
 [Bootstrap betiği](bootstrap.sh) hâlen **v0.3.22** sürümüne sabitlenmiştir; geliştirme sürümünü kurmaz.
 
+## 📧 SMTP ve e-posta bildirimleri
+
+LKSU, Postmark, SMTP2GO veya özel SMTP sağlayıcısı üzerinden güncelleme olaylarına ilişkin e-posta raporları gönderebilir. Kurulumda alıcı adresi, SMTP bilgileri ve bildirim tercihleri sorulur.
+
+**Ayrıntılı kurulum, portlar, TLS/STARTTLS, yapılandırma anahtarları, güvenlik ve sorun giderme:** [SMTP ve e-posta rehberi](docs/email-smtp.tr.md).
+
 ## Sık kullanılan komutlar
 
 ```bash
@@ -86,7 +92,7 @@ lksu configure-server-name    # Raporlarda görünen sunucu adı
 
 ## Belgeler
 
-[Platform desteği](docs/platform-support.tr.md) · [Önceki ayrıntılı README (arşiv)](docs/README-legacy.md) · [Kaynak kod](src/lksu/) · [Hata ve öneriler](https://github.com/KeygenLTD/linux-kernel-security-updater/issues)
+[Platform desteği](docs/platform-support.tr.md) · [Kaynak kod](src/lksu/) · [Hata ve öneriler](https://github.com/KeygenLTD/linux-kernel-security-updater/issues)
 
 **Not:** Bir CVE'nin kapatıldığını söylemek için üreticinin ilgili düzeltmesinin kurulması, düzeltilmiş kernelin çalışması ve doğrulama gerekir. Geçici önlem, yamanın yerini tutmaz.
 
