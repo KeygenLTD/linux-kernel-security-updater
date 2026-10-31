@@ -73,11 +73,15 @@ def validate_reboot_health_checks(services, health_urls):
         )
 
 
+def _language_label(lang):
+    return "Türkçe" if lang == "tr" else "English"
+
+
 def choose_report_language(current="tr"):
     """Choose report language; invalid answers never change saved configuration."""
-    value = input("Email report language [tr/en] (default {}): ".format(current)).strip().lower() or current
+    value = input(("Rapor ve arayüz dili [tr/en] (varsayılan {}): " if current == "tr" else "Report and interface language [tr/en] (default {}): ").format(current)).strip().lower() or current
     if value not in {"tr", "en"}:
-        raise core.LKSUError("Language must be tr or en")
+        raise core.LKSUError("Dil tr veya en olmalıdır / Language must be tr or en")
     return value
 
 
@@ -88,7 +92,7 @@ def configure_language():
     cfg = core.config()
     cfg["report_language"] = choose_report_language(cfg.get("report_language", "en"))
     core.save(core.CONFIG, cfg)
-    print("Email report language saved: " + cfg["report_language"])
+    print(("Rapor ve arayüz dili kaydedildi: " if cfg["report_language"] == "tr" else "Report and interface language saved: ") + _language_label(cfg["report_language"]))
 
 
 def setup():
