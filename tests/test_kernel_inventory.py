@@ -39,9 +39,9 @@ class KernelInventoryTests(unittest.TestCase):
         distro_info = Distribution("almalinux", "9.8", "rhel", "dnf/rpm", "rpm-kernel",
                                    "grubby/grub2-reboot", "enabled", "guarded", "test")
         proc = SimpleNamespace(returncode=0, stdout="kernel-core 5.14.0-687.61.1.el9_8.x86_64\\n", stderr="")
-        with patch("lksu.kernel_inventory.detect", return_value=distro_info), \\
-             patch.object(core, "run", return_value=proc) as runner, \\
-             patch.object(core.os, "uname", return_value=SimpleNamespace(release="5.14.0-687.61.1.el9_8.x86_64")):
+        with (patch("lksu.kernel_inventory.detect", return_value=distro_info),
+              patch.object(core, "run", return_value=proc) as runner,
+              patch.object(core.os, "uname", return_value=SimpleNamespace(release="5.14.0-687.61.1.el9_8.x86_64"))):
             result = inventory()
         self.assertEqual(result["installed_kernel_packages"][0]["name"], "kernel-core")
         self.assertEqual(result["automatic_updates"], "configured-separately")
