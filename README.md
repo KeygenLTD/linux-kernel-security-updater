@@ -138,3 +138,10 @@ flowchart LR
     I -->|Yes| J["Confirm new kernel"]
     I -->|No| K["Keep previous fallback"]
 ```
+
+## 🧩 Community and contributing
+
+[Report an issue](https://github.com/KeygenLTD/linux-kernel-security-updater/issues/new/choose) · [Contributing guide](CONTRIBUTING.md) · [Security policy](SECURITY.md) · [Recovery playbook](docs/recovery.md) · [CVE guide](docs/cve-security.md)
+
+> [!NOTE]
+> Planned features are not implemented features. See the [issue tracker](https://github.com/KeygenLTD/linux-kernel-security-updater/issues) for current work.
