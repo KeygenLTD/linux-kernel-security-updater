@@ -22,6 +22,9 @@ def disk(free):
 
 class SafeKernelCleanupTests(unittest.TestCase):
     def setUp(self):
+        space = patch.object(core, "required_boot_free_bytes", return_value=500 * MIB)
+        space.start()
+        self.addCleanup(space.stop)
         # CI runners are unprivileged; exercise the code under mocked root.
         root = patch.object(kernel_cleanup.os, "geteuid", return_value=0)
         root.start()
