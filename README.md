@@ -75,3 +75,12 @@ lksu configure-server-name    # Email/report display name
 [Platform support](docs/platform-support.md) · [Türkçe platform desteği](docs/platform-support.tr.md) · [Previous detailed README (archive)](docs/README-legacy.md) · [Source code](src/lksu/) · [Issues](https://github.com/KeygenLTD/linux-kernel-security-updater/issues)
 
 **Security note:** A CVE is only remediated when the vendor's applicable fix is installed, the fixed kernel is running, and verification succeeds. Temporary mitigations are not equivalent to a patch.
+
+## Frequently asked questions
+
+<details>
+<summary>Does LKSU reboot every 15 minutes?</summary>
+
+No. Checks run every 15 minutes; automatic installation and reboot require explicit opt-ins and safety checks.
+
+</details>
