@@ -118,6 +118,33 @@ class CLIReportTests(unittest.TestCase):
         send.assert_not_called()
 
 
+
+    def test_turkish_trial_boot_does_not_claim_reboot(self):
+        cfg = dict(CONFIG, report_language="tr")
+        with patch("lksu.reporting.core.STATE") as state:
+            state.exists.return_value = False
+            subject, body = build_email_report(
+                cfg, "stage-reboot", {"status": "trial-staged", "running": "6.12.0-current"},
+                timestamp=WHEN, hostname="test-node", os_name="AlmaLinux 10",
+                installed_kernels=["6.12.0-previous"],
+            )
+        self.assertIn("deneme açılışı hazırlandı", body.lower())
+        self.assertIn("yeniden başlatmanın gerçekleştiğini kanıtlamaz", body)
+        self.assertNotIn("this message does not prove", body.lower())
+
+    def test_turkish_initial_check_only_outcome(self):
+        cfg = dict(CONFIG, report_language="tr")
+        with patch("lksu.reporting.core.STATE") as state:
+            state.exists.return_value = False
+            _, body = build_email_report(
+                cfg, "initialize", {"status": "initial-check-only", "running": "6.12.0-current"},
+                timestamp=WHEN, hostname="test-node", os_name="AlmaLinux 10",
+                installed_kernels=["6.12.0-previous"],
+            )
+        self.assertIn("otomatik kernel kurulumu için izin verilmedi", body)
+        self.assertNotIn("automatic kernel installation was not authorized", body.lower())
+
+
 if __name__ == "__main__":
     unittest.main()
 
