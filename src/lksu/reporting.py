@@ -267,6 +267,7 @@ def build_email_report(cfg, command, result, *, timestamp=None, hostname=None, o
         timestamp = datetime.now().astimezone()
     if hostname is None:
         hostname = socket.gethostname()
+    hostname = cfg.get("display_name") or hostname
     if os_name is None:
         os_name = _os_name()
     if installed_kernels is None:
@@ -378,7 +379,7 @@ def format_console_report(cfg, command, result):
         "",
         "LKSU | Linux Kernel Security Updater",
         "-" * 42,
-        "Host:             " + os.uname().nodename,
+        "Host:             " + (cfg.get("display_name") or os.uname().nodename),
         "Operation:        " + command,
         "Status:           " + level,
         "Summary:          " + summary,
