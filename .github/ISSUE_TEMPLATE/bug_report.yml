@@ -1,0 +1,35 @@
+name: Bug report
+description: Report an LKSU issue without sharing credentials
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not disclose security vulnerabilities here. See SECURITY.md."
+  - type: input
+    id: version
+    attributes:
+      label: LKSU version
+      placeholder: "lksu --version"
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Distribution and version
+      placeholder: "AlmaLinux 9"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps and observed behavior
+      description: Remove IP addresses, secrets and private hostnames.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
