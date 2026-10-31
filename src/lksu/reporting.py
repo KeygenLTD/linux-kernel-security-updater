@@ -92,6 +92,41 @@ _TR_PHRASES = {
     "Not confirmed by this count alone": "Yalnızca bu sayı ile doğrulanamaz",
     "Important: A preserved kernel is not a VM snapshot or a proven rollback. Confirm provider-console recovery before reboot.": "Önemli: Korunan kernel VM snapshot'ı veya doğrulanmış geri dönüş değildir. Yeniden başlatmadan önce sağlayıcı konsolundan kurtarmayı doğrulayın.",
 }
+_TR_PHRASES.update({
+    "installed package status not checked": "kurulu paket durumu kontrol edilmedi",
+    "RPM and boot image present; recovery boot not tested": "RPM ve açılış dosyası mevcut; kurtarma açılışı test edilmedi",
+    "rollback availability NOT verified: RPM or boot image missing": "geri dönüş kullanılabilirliği DOĞRULANAMADI: RPM veya açılış dosyası eksik",
+    "No action indicated.": "İşlem gerekmiyor.",
+    "Review the details below.": "Aşağıdaki ayrıntıları inceleyin.",
+    "No immediate action indicated; keep checking for advisories.": "Şu anda işlem gerekmiyor; güvenlik duyurularını kontrol etmeye devam edin.",
+    "No eligible security advisories found in the available DNF metadata; no installation.": "DNF verilerinde uygun güvenlik duyurusu bulunamadı; kurulum yapılmadı.",
+    "LKSU command returned without an error.": "LKSU komutu hata olmadan tamamlandı.",
+    "A kernel transition is pending post-boot verification; no further kernel installation was attempted.": "Kernel geçişinin açılış sonrası doğrulaması bekleniyor; yeni kurulum denenmedi.",
+    "Yes - check the booted kernel and run lksu verify.": "Evet - çalışan kerneli kontrol edin ve lksu verify çalıştırın.",
+    "The default boot kernel is installed but differs from the running kernel; no further package upgrade is necessarily needed.": "Varsayılan açılış kerneli kurulu ancak çalışan kernelden farklı; yeni paket kurulumu gerekmeyebilir.",
+    "Review the boot target and allow a guarded trial reboot when authorized by configuration.": "Açılış hedefini inceleyin; yapılandırma izin veriyorsa korumalı deneme açılışı yapın.",
+    "Kernel packages installed; the running kernel has not yet been verified after reboot.": "Kernel paketleri kuruldu; yeniden başlatma sonrası çalışan kernel henüz doğrulanmadı.",
+    "Yes - arrange a controlled reboot and run lksu verify after boot.": "Evet - kontrollü yeniden başlatma planlayın ve açılıştan sonra lksu verify çalıştırın.",
+    "One-shot trial boot was staged; the previous kernel remains the persistent fallback.": "Tek seferlik deneme açılışı hazırlandı; önceki kernel kalıcı geri dönüş seçeneği olarak korundu.",
+    "Monitor host access and complete post-boot health verification.": "Sunucu erişimini izleyin ve açılış sonrası sağlık doğrulamasını tamamlayın.",
+    "A new kernel is installed or ready for boot, but unattended reboot was blocked by safety checks.": "Yeni kernel kurulu veya açılışa hazır; gözetimsiz yeniden başlatma güvenlik kontrollerince engellendi.",
+    "Routine monitoring and maintenance timers continue.": "Düzenli izleme ve bakım zamanlayıcıları çalışmaya devam ediyor.",
+    "Enabled (subject to safety checks)": "Etkin (güvenlik kontrollerine bağlı)",
+    "Every 15 minutes (24/7 timer)": "Her 15 dakikada (7/24 zamanlayıcı)",
+})
+_TR_COMMANDS = {
+    "verify": "doğrulama", "check": "kontrol", "scheduled": "zamanlanmış kontrol",
+    "maintenance": "bakım", "apply": "kurulum", "initialize": "başlatma",
+    "stage-reboot": "deneme açılışını hazırlama", "self-update": "LKSU güncelleme",
+    "self-update-check": "LKSU güncelleme kontrolü", "self-update-scheduled": "zamanlanmış LKSU güncellemesi",
+    "security-check": "güvenlik kontrolü", "security-baseline": "güvenlik temel kaydı",
+    "select-old": "eski kerneli seçme",
+}
+_TR_EXTRA = {
+    "available": "mevcut", "listed (not proof of unpatched CVEs)": "listelendi (yamasız CVE kanıtı değildir)",
+    "Removed obsolete kernel RPMs": "Eski kernel RPM paketleri kaldırıldı",
+}
+
 def _translate_line(line):
     if line in _TR_PHRASES:
         return _TR_PHRASES[line]
@@ -102,8 +137,11 @@ def _translate_line(line):
         key = head.strip()
         if key in _TR:
             tail = tail.strip()
-            tail = _TR_PHRASES.get(tail, _TR.get(tail, tail))
+            tail = _TR_PHRASES.get(tail, _TR.get(tail, _TR_COMMANDS.get(tail, tail)))
             return _TR[key] + ": " + tail
+    for english, turkish in _TR_EXTRA.items():
+        if line.startswith("- " + english + ":"):
+            return line.replace(english, turkish, 1)
     return line
 
 
@@ -373,4 +411,4 @@ def format_console_report(cfg, command, result):
     lines.append("Next action:      " + action)
     lines.append("Full technical details: lksu " + command + " --json")
     lines.append("")
-    return "\n".join(lines)
+    return _localize_report(cfg, "", "\n".join(lines))[1]
