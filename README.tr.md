@@ -5,7 +5,7 @@
 
 **Otomatik kontrol. Güvenli kernel güncellemesi. Doğrulanabilir geri dönüş.**
 
-[🇹🇷 Türkçe](README.tr.md) · [🇬🇧 English](README.md) · [İşletim sistemi desteği](docs/platform-support.md)
+[🇹🇷 Türkçe](README.tr.md) · [🇬🇧 English](README.md) · [İşletim sistemi desteği](docs/platform-support.tr.md)
 
 ![LKSU işleyişi](docs/assets/lksu-hero.png)
 
@@ -34,7 +34,7 @@
 | Ubuntu, Debian | Algılama ve salt okunur envanter; otomatik kernel değişikliği engelli |
 | Diğer algılanabilen Linux sistemleri | Desteklenen yerlerde yalnızca algılama |
 
-Ayrıntılar: [Platform ve güvenlik matrisi](docs/platform-support.md). **Algılanması, güncellemenin desteklendiği anlamına gelmez.**
+Ayrıntılar: [Platform ve güvenlik matrisi](docs/platform-support.tr.md). **Algılanması, güncellemenin desteklendiği anlamına gelmez.**
 
 ## Kurulum
 
@@ -72,6 +72,6 @@ lksu configure-server-name    # Raporlarda görünen sunucu adı
 
 ## Belgeler
 
-[Platform desteği](docs/platform-support.md) · [Önceki ayrıntılı README (arşiv)](docs/README-legacy.md) · [Kaynak kod](src/lksu/) · [Hata ve öneriler](https://github.com/KeygenLTD/linux-kernel-security-updater/issues)
+[Platform desteği](docs/platform-support.tr.md) · [Önceki ayrıntılı README (arşiv)](docs/README-legacy.md) · [Kaynak kod](src/lksu/) · [Hata ve öneriler](https://github.com/KeygenLTD/linux-kernel-security-updater/issues)
 
 **Not:** Bir CVE'nin kapatıldığını söylemek için üreticinin ilgili düzeltmesinin kurulması, düzeltilmiş kernelin çalışması ve doğrulama gerekir. Geçici önlem, yamanın yerini tutmaz.
