@@ -145,3 +145,19 @@ flowchart LR
 
 > [!NOTE]
 > Planned features are not implemented features. See the [issue tracker](https://github.com/KeygenLTD/linux-kernel-security-updater/issues) for current work.
+
+## 🧰 Troubleshooting
+
+<details>
+<summary>Why are updates not installing?</summary>
+
+Check `lksu active`, `lksu check --json` and `lksu compatibility --json`. Confirm update opt-in and distribution support.
+
+</details>
+
+<details>
+<summary>Why was the kernel installed without a reboot?</summary>
+
+Review `sudo lksu configure-automation`. Reboot can be blocked by missing snapshot/console confirmation, health checks or verification service readiness.
+
+</details>
