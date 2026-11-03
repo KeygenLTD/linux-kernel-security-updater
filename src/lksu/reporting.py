@@ -161,7 +161,7 @@ def build_email_report(cfg, command, result, *, timestamp=None, hostname=None, o
         ("Tarih: " if tr else "Time: ") + timestamp.isoformat(timespec="seconds"),
         "",
     ])
-    return "LKSU | {} | {}".format(heading, server), "\\n".join(lines)
+    return "LKSU | {} | {}".format(heading, server), "\n".join(lines)
 
 
 def format_console_report(cfg, command, result):
