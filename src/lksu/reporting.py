@@ -102,114 +102,66 @@ def _outcome(command, result):
 
 
 def build_email_report(cfg, command, result, *, timestamp=None, hostname=None, os_name=None, installed_kernels=None):
-    """Return (subject, plaintext); optional arguments allow deterministic unit tests.
-
-    installed_kernels=None means query the local RPM DB; an empty list means an
-    actual empty result. The format never presents an unknown update state as 0.
-    """
+    """Concise, outcome-focused email. Unknown states are never called successful."""
     if timestamp is None:
         timestamp = datetime.now().astimezone()
     if hostname is None:
         hostname = socket.gethostname()
-    if os_name is None:
-        os_name = _os_name()
-    if installed_kernels is None:
-        installed_kernels = _installed_kernels()
-    level, summary, action = _outcome(command, result)
-    updates = result.get("updates")
-    advisories = result.get("security_advisories")
-    package_count = str(len(updates)) if isinstance(updates, list) else "Not checked"
-    advisory_items = [a for a in advisories if isinstance(a, dict) and a.get("id")] if isinstance(advisories, list) else []
-    advisory_count = str(len(advisory_items)) if isinstance(advisories, list) else "Not checked"
-
+    server = str(cfg.get("display_name") or hostname)
+    tr = str(cfg.get("report_language", "en")).lower() == "tr"
+    status = result.get("status")
+    verified = command == "verify" and result.get("healthy") is True and result.get("verification_performed") is not False
+    failed_verify = command == "verify" and result.get("healthy") is False and result.get("verification_performed") is not False
+    error = status in {"error", "reboot-blocked"}
+    manual = status == "installed-awaiting-manual-reboot"
+    if verified:
+        heading = "Güncelleme Başarılı" if tr else "Update Successful"
+        detail = "Yeni kernel doğrulandı ve sağlık kontrolleri başarılı." if tr else "New kernel verified; health checks passed."
+        action = "İşlem gerekmiyor." if tr else "No action required."
+    elif failed_verify:
+        heading = "Müdahale Gerekiyor" if tr else "Action Required"
+        detail = "Yeniden başlatma sonrası doğrulama başarısız. Güncelleme tamamlanmış sayılmaz." if tr else "Post-boot verification failed. Update is not confirmed complete."
+        action = "Başarısız servisleri ve kurtarma erişimini kontrol edin." if tr else "Check failed services and recovery access."
+    elif manual:
+        heading = "Müdahale Gerekiyor" if tr else "Action Required"
+        detail = "Kernel kuruldu ancak yeni kernel henüz çalışırken doğrulanmadı." if tr else "Kernel installed but not yet verified while running."
+        action = "Güvenli yeniden başlatma ve ardından doğrulama gerekiyor." if tr else "Controlled reboot and subsequent verification required."
+    elif error:
+        heading = "Güncelleme Yapılamadı" if tr else "Update Failed"
+        detail = str(result.get("error") or result.get("reboot_block_reason") or ("Bilinmeyen hata" if tr else "Unknown failure"))[:500]
+        action = "Sunucu durumunu kontrol edin; otomatik tekrar deneme doğrulanmadı." if tr else "Check server status; automatic retry not confirmed."
+    elif status == "self-updated":
+        heading = "LKSU Güncellendi" if tr else "LKSU Updated"
+        detail = str(result.get("installed_version") or ("Sürüm belirtilmedi" if tr else "Version not reported"))
+        action = "İşlem gerekmiyor." if tr else "No action required."
+    else:
+        heading = "İşlem Durumu Belirsiz" if tr else "Operation Status Unknown"
+        detail = str(status or "unknown")
+        action = "Teknik kayıtları kontrol edin." if tr else "Review technical logs."
     lines = [
-        "LKSU | Linux Kernel Security Updater",
-        "=" * 42,
+        "LKSU | " + heading,
         "",
-        "Summary",
-        "-------",
-        "Result: " + level,
-        "Operation: " + command,
-        "Details: " + summary,
-        "Action required: " + action,
-        "",
-        "Server",
-        "------",
-        "Hostname: " + str(hostname),
-        "Operating system: " + str(os_name),
-        "Report time: " + timestamp.isoformat(timespec="seconds"),
-        "Running kernel: " + str(result.get("running") or os.uname().release),
-        "Installed kernels: " + (", ".join(installed_kernels) if installed_kernels else ("None found" if installed_kernels == [] else "Not available")),
-        "Default kernel: " + str(result.get("default", "Not checked")),
-        "Boot status: " + str(result.get("boot_status", "Not checked")),
-        "Reboot required: " + ("Yes" if result.get("reboot_required") is True else ("No" if result.get("reboot_required") is False else "Not determined")),
-        "Reboot target: " + str(result.get("reboot_target") or result.get("new_default") or "Not established"),
-        "Rollback kernel: " + _rollback_status(installed_kernels, result),
-        "",
-        "Update assessment",
-        "-----------------",
-        "Kernel package upgrades: " + package_count,
-        "Security advisories: " + advisory_count,
-        "Advisory applicability: Not confirmed by this count alone",
-        "Install policy: " + str(cfg.get("policy", "Not configured")),
-        "Automatic installation: " + ("Enabled" if cfg.get("automatic_updates", False) else "Disabled"),
-        "Automatic reboot: " + ("Enabled" if cfg.get("automatic_reboot", False) else "Disabled"),
-        "Recovery readiness approval: " + ("Confirmed by operator" if cfg.get("recovery_ready") else "Not confirmed"),
-        "Automatic LKSU application updates: " + ("Enabled" if cfg.get("automatic_lksu_updates") else "Disabled"),
-        "",
-        "Scheduling",
-        "----------",
-        "Kernel check interval: Every 15 minutes (24/7, when timer is enabled)",
-        "Automatic kernel installation: Requires automatic_updates and eligible policy",
-        "Unattended reboot: Requires opt-in and passing recovery/health checks",
-        "Next scheduled check: Not determined here; inspect systemctl list-timers on the host.",
+        ("Sunucu: " if tr else "Server: ") + server,
+        ("Sonuç: " if tr else "Result: ") + detail,
     ]
-    removed = result.get("cleaned_old_kernels")
-    if isinstance(removed, list) and removed:
-        lines.extend(["", "Old kernel cleanup", "------------------"])
-        for release in removed[:10]:
-            lines.append("- Removed obsolete kernel RPMs: " + str(release)[:120])
-    if isinstance(updates, list) and updates:
-        lines.extend(["", "Available kernel packages", "-------------------------"])
-        for item in updates[:30]:
-            if isinstance(item, dict):
-                lines.append("- {} {} ({})".format(item.get("name", "?"), item.get("evr", "?"), item.get("arch", "?")))
-        if len(updates) > 30:
-            lines.append("- ... {} additional packages".format(len(updates) - 30))
-    if advisory_items:
-        lines.extend(["", "Security advisories", "-------------------"])
-        for item in advisory_items[:5]:
-            cves = item.get("cves") or []
-            cve_text = ", ".join(str(v) for v in cves[:3]) if isinstance(cves, list) and cves else "CVEs not listed"
-            if isinstance(cves, list) and len(cves) > 3:
-                cve_text += " (+{} more CVEs)".format(len(cves) - 3)
-            lines.append("- {} | {} | {}".format(item.get("id"), item.get("severity", "Unknown"), cve_text))
-        if len(advisory_items) > 5:
-            lines.append("- ... {} additional advisories; use lksu check --json for details".format(len(advisory_items) - 5))
-    if isinstance(advisories, list):
-        for item in advisories:
-            if isinstance(item, dict) and item.get("warning"):
-                lines.append("Advisory warning: " + str(item["warning"])[:300])
-    if result.get("status", "").startswith("self-update"):
-        lines.extend(["", "LKSU application", "----------------",
-            "Installed application version: " + str(result.get("installed_version", "Not checked")),
-            "Available release: " + str(result.get("release_version", "Not checked"))])
-    if result.get("reboot_block_reason"):
-        lines.extend(["", "Reboot safety block", "-------------------", str(result["reboot_block_reason"])[:600]])
-    if result.get("error"):
-        lines.extend(["", "Failure details", "---------------", str(result["error"])[:1000]])
-    if "services" in result and isinstance(result["services"], dict):
-        lines.extend(["", "Post-boot health checks", "-----------------------"])
-        for name, passed in sorted(result["services"].items()):
-            lines.append("- {}: {}".format(name, "PASS" if passed else "FAIL"))
-    if isinstance(result.get("alerts"), list) and result["alerts"]:
-        lines.extend(["", "Security findings", "-----------------"])
-        for alert in result["alerts"][:20]:
-            if isinstance(alert, dict):
-                lines.append("- {} [{}]: {}".format(alert.get("code", "?"), alert.get("severity", "?"), str(alert.get("message", ""))[:200]))
-    lines.extend(["", "Important: A preserved kernel is not a VM snapshot or a proven rollback. Confirm provider-console recovery before reboot.", ""])
-    subject = "LKSU [{}] {} | {}".format(level, hostname, command)
-    return subject, "\n".join(lines)
+    old = result.get("old_kernel")
+    new = result.get("running") if verified else result.get("new_default") or result.get("reboot_target")
+    if old:
+        lines.append(("Önceki kernel: " if tr else "Previous kernel: ") + str(old))
+    if new:
+        lines.append(("Yeni kernel: " if tr else "New kernel: ") + str(new))
+    services = result.get("services")
+    if isinstance(services, dict):
+        bad = [str(name) for name, ok in services.items() if not ok]
+        if bad:
+            lines.append(("Başarısız kontroller: " if tr else "Failed checks: ") + ", ".join(bad[:12]))
+    lines.extend([
+        "",
+        ("Yapılması gereken: " if tr else "Next action: ") + action,
+        ("Tarih: " if tr else "Time: ") + timestamp.isoformat(timespec="seconds"),
+        "",
+    ])
+    return "LKSU | {} | {}".format(heading, server), "\\n".join(lines)
 
 
 def format_console_report(cfg, command, result):
