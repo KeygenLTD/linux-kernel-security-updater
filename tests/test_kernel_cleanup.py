@@ -63,7 +63,7 @@ class SafeKernelCleanupTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder, patch.object(
             core, "STATE", Path(folder) / "state.json"
         ), patch.object(kernel_cleanup.shutil, "disk_usage", side_effect=[
-            disk(480 * MIB), disk(650 * MIB)
+            disk(130 * MIB), disk(650 * MIB)
         ]), patch.object(core.os, "uname", return_value=type(
             "U", (), {"release": RUNNING, "machine": "x86_64"}
         )()), patch.object(core, "run", side_effect=fake_run), patch.object(
@@ -80,7 +80,7 @@ class SafeKernelCleanupTests(unittest.TestCase):
         self.assertNotIn(FALLBACK, " ".join(dnf_removals[0]))
 
     def test_low_space_with_only_two_kernels_refuses_cleanup(self):
-        with patch.object(kernel_cleanup.shutil, "disk_usage", return_value=disk(250 * MIB)), patch.object(
+        with patch.object(kernel_cleanup.shutil, "disk_usage", return_value=disk(100 * MIB)), patch.object(
             kernel_cleanup, "_kernel_core_install_times", return_value={FALLBACK: 100, RUNNING: 200}
         ), patch.object(kernel_cleanup, "_protected_releases", return_value={FALLBACK, RUNNING}), patch.object(
             core, "run"
@@ -106,7 +106,7 @@ class SafeKernelCleanupTests(unittest.TestCase):
                 kernel_cleanup._protected_releases({ANCIENT: 100, FALLBACK: 200, RUNNING: 300})
 
     def test_all_protected_kernels_refuse_cleanup(self):
-        with patch.object(kernel_cleanup.shutil, "disk_usage", return_value=disk(450 * MIB)), patch.object(
+        with patch.object(kernel_cleanup.shutil, "disk_usage", return_value=disk(100 * MIB)), patch.object(
             kernel_cleanup, "_kernel_core_install_times", return_value={
                 ANCIENT: 100, FALLBACK: 200, RUNNING: 300
             }
@@ -118,7 +118,7 @@ class SafeKernelCleanupTests(unittest.TestCase):
             run.assert_not_called()
 
     def test_rpm_dependency_check_must_pass_before_dnf_removal(self):
-        with patch.object(kernel_cleanup.shutil, "disk_usage", return_value=disk(450 * MIB)), patch.object(
+        with patch.object(kernel_cleanup.shutil, "disk_usage", return_value=disk(100 * MIB)), patch.object(
             kernel_cleanup, "_kernel_core_install_times", return_value={
                 ANCIENT: 100, FALLBACK: 200, RUNNING: 300
             }
@@ -141,7 +141,7 @@ class SafeKernelCleanupTests(unittest.TestCase):
 
     def test_applying_update_reclaims_space_only_if_needed(self):
         available = {
-            "running": RUNNING, "boot_free_mib": 410,
+            "running": RUNNING, "boot_free_mib": 110,
             "updates": [{"name": "kernel-core", "evr": "latest", "arch": "x86_64"}],
             "security_advisories": [],
         }

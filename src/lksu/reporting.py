@@ -8,6 +8,71 @@ from pathlib import Path
 from . import core
 
 
+
+
+_TR_LABELS = {
+    "Summary": "Özet", "Result": "Sonuç", "Operation": "İşlem",
+    "Details": "Açıklama", "Action required": "Gerekli işlem",
+    "Server": "Sunucu", "Server name": "Sunucu adı", "Hostname": "Makine adı",
+    "Operating system": "İşletim sistemi", "Report time": "Rapor zamanı",
+    "Running kernel": "Çalışan kernel", "Installed kernels": "Kurulu kerneller",
+    "Default kernel": "Varsayılan kernel", "Boot status": "Açılış durumu",
+    "Reboot required": "Yeniden başlatma gerekli", "Reboot target": "Açılış hedefi",
+    "Rollback kernel": "Geri dönüş kerneli", "Update assessment": "Güncelleme değerlendirmesi",
+    "Kernel package upgrades": "Kernel paket güncellemeleri",
+    "Security advisories": "Güvenlik duyuruları", "Advisory applicability": "Duyuru uygulanabilirliği",
+    "Install policy": "Kurulum politikası", "Automatic installation": "Otomatik kurulum",
+    "Automatic reboot": "Otomatik yeniden başlatma",
+    "Recovery readiness approval": "Kurtarma hazırlığı onayı",
+    "Automatic LKSU application updates": "Otomatik LKSU güncellemeleri",
+    "Scheduling": "Zamanlama", "Kernel check interval": "Kernel kontrol aralığı",
+    "Next scheduled check": "Sonraki planlı kontrol",
+    "Old kernel cleanup": "Eski kernel temizliği",
+    "Available kernel packages": "Mevcut kernel paketleri",
+    "Failure details": "Hata ayrıntıları", "Post-boot health checks": "Açılış sonrası servis kontrolleri",
+    "Security findings": "Güvenlik bulguları",
+    "Host": "Sunucu", "Status": "Durum", "Next action": "Sonraki işlem",
+    "Package upgrades": "Paket güncellemeleri", "Advisories": "Duyurular",
+    "Kernel updates": "Kernel güncellemeleri", "Kernel checks": "Kernel kontrolleri",
+    "LKSU self-update": "LKSU otomatik güncelleme", "Error": "Hata",
+    "Reboot blocked": "Yeniden başlatma engellendi",
+}
+_TR_LEVELS = {
+    "VERIFIED": "DOĞRULANDI", "ERROR": "HATA", "ACTION REQUIRED": "MÜDAHALE GEREKLİ",
+    "REBOOT BLOCKED": "YENİDEN BAŞLATMA ENGELLENDİ",
+    "NO UPDATES": "GÜNCELLEME YOK", "NO SECURITY UPDATES": "GÜVENLİK GÜNCELLEMESİ YOK",
+    "REBOOT REQUIRED": "YENİDEN BAŞLATMA GEREKLİ",
+    "REBOOT PENDING": "YENİDEN BAŞLATMA BEKLENİYOR",
+    "TRIAL BOOT STAGED": "DENEME AÇILIŞI HAZIR",
+    "VERIFICATION PENDING": "DOĞRULAMA BEKLENİYOR",
+    "LKSU UPDATED": "LKSU GÜNCELLENDİ", "LKSU CURRENT": "LKSU GÜNCEL",
+    "SECURITY ALERT": "GÜVENLİK UYARISI", "COMPLETED": "TAMAMLANDI",
+}
+_TR_SENTENCES = {
+    "Post-boot service and kernel verification passed.": "Yeniden başlatma sonrası kernel ve servis kontrolleri başarılı.",
+    "No immediate action indicated.": "Herhangi bir işlem gerekmiyor.",
+    "Command failed; results must not be treated as a successful check.": "İşlem başarısız; bu sonuç başarılı kontrol olarak değerlendirilmemeli.",
+    "Yes - investigate the error shown below.": "Evet — aşağıdaki hata ayrıntılarını inceleyin.",
+    "No kernel package upgrades found in enabled repositories.": "Etkin depolarda yeni kernel paketi bulunamadı.",
+    "One-shot trial boot was staged; the previous kernel remains the persistent fallback.": "Tek seferlik deneme açılışı hazırlandı; önceki kernel geri dönüş için korunuyor.",
+    "Monitor host access and complete post-boot health verification.": "Sunucu erişimini izleyin ve açılış sonrası sağlık doğrulamasını tamamlayın.",
+}
+
+def _localize(cfg, content):
+    """Translate presentation text only; never modify machine-readable data."""
+    if cfg.get("language", "en") != "tr":
+        return content
+    output = []
+    for line in content.split("\\n"):
+        if ": " in line:
+            key, value = line.split(": ", 1)
+            line = _TR_LABELS.get(key.strip(), key) + ": " + _TR_SENTENCES.get(value, _TR_LEVELS.get(value, value))
+        else:
+            line = _TR_LABELS.get(line, _TR_SENTENCES.get(line, _TR_LEVELS.get(line, line)))
+        output.append(line)
+    return "\\n".join(output)
+
+
 def _os_name():
     try:
         for line in Path("/etc/os-release").read_text().splitlines():
@@ -135,6 +200,7 @@ def build_email_report(cfg, command, result, *, timestamp=None, hostname=None, o
         "",
         "Server",
         "------",
+        "Server name: " + str(cfg.get("server_name") or hostname),
         "Hostname: " + str(hostname),
         "Operating system: " + str(os_name),
         "Report time: " + timestamp.isoformat(timespec="seconds"),
@@ -208,8 +274,10 @@ def build_email_report(cfg, command, result, *, timestamp=None, hostname=None, o
             if isinstance(alert, dict):
                 lines.append("- {} [{}]: {}".format(alert.get("code", "?"), alert.get("severity", "?"), str(alert.get("message", ""))[:200]))
     lines.extend(["", "Important: A preserved kernel is not a VM snapshot or a proven rollback. Confirm provider-console recovery before reboot.", ""])
-    subject = "LKSU [{}] {} | {}".format(level, hostname, command)
-    return subject, "\n".join(lines)
+    subject = "LKSU [{}] {} | {}".format(level, cfg.get("server_name") or hostname, command)
+    if cfg.get("language") == "tr":
+        subject = "LKSU [{}] {} | {}".format(_TR_LEVELS.get(level, level), cfg.get("server_name") or hostname, command)
+    return subject, _localize(cfg, "\n".join(lines))
 
 
 def format_console_report(cfg, command, result):
@@ -222,7 +290,7 @@ def format_console_report(cfg, command, result):
         "",
         "LKSU | Linux Kernel Security Updater",
         "-" * 42,
-        "Host:             " + os.uname().nodename,
+        "Host:             " + str(cfg.get("server_name") or os.uname().nodename),
         "Operation:        " + command,
         "Status:           " + level,
         "Summary:          " + summary,
@@ -264,4 +332,4 @@ def format_console_report(cfg, command, result):
     lines.append("Next action:      " + action)
     lines.append("Full technical details: lksu " + command + " --json")
     lines.append("")
-    return "\n".join(lines)
+    return _localize(cfg, "\n".join(lines))
