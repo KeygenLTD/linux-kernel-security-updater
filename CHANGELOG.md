@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.23 — Kernel maintenance notifications
+
+- Send concise English or Turkish notifications for verified outcomes and actions that require attention.
+- Keep intermediate trial-boot staging in local logs and retain recovery guidance for manual reboots.
+- Preserve existing release wheels on subsequent pushes that keep the same version.
+
 ## v0.3.22 — Cross-distribution read-only kernel inventory
 
 - Implement `lksu kernel-inventory --json` for installed APT linux-image and RPM kernel packages including CloudLinux variants.

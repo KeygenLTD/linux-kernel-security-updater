@@ -125,7 +125,10 @@ def build_email_report(cfg, command, result, *, timestamp=None, hostname=None, o
     elif manual:
         heading = "Müdahale Gerekiyor" if tr else "Action Required"
         detail = "Kernel kuruldu ancak yeni kernel henüz çalışırken doğrulanmadı." if tr else "Kernel installed but not yet verified while running."
-        action = "Güvenli yeniden başlatma ve ardından doğrulama gerekiyor." if tr else "Controlled reboot and subsequent verification required."
+        action = (
+            "Sağlayıcı konsolundan kurtarma erişimini teyit edin. Kontrollü yeniden başlatma sonrası doğrulama yapın."
+            if tr else "Confirm provider-console recovery before a controlled reboot, then verify."
+        )
     elif error:
         heading = "Güncelleme Yapılamadı" if tr else "Update Failed"
         detail = str(result.get("error") or result.get("reboot_block_reason") or ("Bilinmeyen hata" if tr else "Unknown failure"))[:500]
@@ -133,6 +136,16 @@ def build_email_report(cfg, command, result, *, timestamp=None, hostname=None, o
     elif status == "self-updated":
         heading = "LKSU Güncellendi" if tr else "LKSU Updated"
         detail = str(result.get("installed_version") or ("Sürüm belirtilmedi" if tr else "Version not reported"))
+        action = "İşlem gerekmiyor." if tr else "No action required."
+    elif status in {"no-updates", "no-security-updates"} or (
+        status is None and command in {"check", "scheduled"} and result.get("updates") == []
+    ):
+        security_only = status == "no-security-updates"
+        if tr:
+            heading = "Uygun Güvenlik Güncellemesi Yok" if security_only else "Güncelleme Yok"
+        else:
+            heading = "No Eligible Security Updates" if security_only else "No Updates"
+        detail = "Kernel paketi kurulmadı." if tr else "No kernel packages were installed."
         action = "İşlem gerekmiyor." if tr else "No action required."
     else:
         heading = "İşlem Durumu Belirsiz" if tr else "Operation Status Unknown"
