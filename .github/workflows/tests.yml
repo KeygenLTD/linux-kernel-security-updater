@@ -9,7 +9,8 @@ permissions:
 
 jobs:
   unit:
-    runs-on: ubuntu-latest
+    # Ubuntu 26.04 runner images do not provide Python 3.9 via setup-python.
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         python-version: ["3.9", "3.11", "3.13"]

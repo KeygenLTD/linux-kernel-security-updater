@@ -13,7 +13,7 @@
   <img alt="LKSU — Linux Kernel Security Updater" src="docs/assets/lksu-banner-light.svg">
 </picture>
 
-![Version](https://img.shields.io/badge/development-0.3.23.dev0-blue)
+![Version](https://img.shields.io/badge/version-0.3.23-blue)
 ![AlmaLinux](https://img.shields.io/badge/AlmaLinux-8%20%7C%209%20%7C%2010-168B4C)
 ![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB)
 [![Unit tests](https://github.com/KeygenLTD/linux-kernel-security-updater/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/KeygenLTD/linux-kernel-security-updater/actions/workflows/tests.yml)
@@ -37,7 +37,7 @@
 
 **Also included:** event-based email reports (English/Turkish), custom server display names, Security Watch, conservative old-kernel cleanup, and opt-in LKSU release checks.
 
-> **Development status:** The repository currently declares `0.3.23.dev0`. Features and tests are not proof of universal production readiness. Take an external snapshot and verify provider console access before allowing unattended reboot.
+> Take an external snapshot and verify provider console access before allowing unattended reboot.
 
 ## Supported systems
 
@@ -62,7 +62,7 @@ lksu active
 
 Configuration can authorize **real kernel installation and reboot**. Do not run the setup on an important server without a snapshot, console access, and working service health checks.
 
-The [release bootstrap](bootstrap.sh) currently pins **v0.3.22**, not the development version. Do not treat the development branch as a published stable release.
+The [release bootstrap](bootstrap.sh) pins **v0.3.23**.
 
 ## 📧 SMTP and email notifications
 

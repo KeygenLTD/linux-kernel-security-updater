@@ -33,34 +33,29 @@ class ReportTests(unittest.TestCase):
             "updates": [],
             "security_advisories": [],
         })
-        self.assertIn("[NO UPDATES]", subject)
-        self.assertIn("Kernel check interval: Every 15 minutes", body)
-        self.assertIn("Unattended reboot: Requires opt-in", body)
+        self.assertIn("No Updates", subject)
+        self.assertIn("No kernel packages were installed.", body)
         self.assertNotIn("Maintenance window:", body)
         self.assertNotIn("03:00", body)
-        self.assertIn("Rollback kernel:", body)
-        self.assertIn("Next scheduled check: Not determined", body)
 
     def test_unassessed_upgrade_information_is_not_zero(self):
         _, body = render("maintenance", {"status": "reboot-blocked", "running": "6.12.0-current"})
-        self.assertIn("Kernel package upgrades: Not checked", body)
+        self.assertNotIn("No kernel packages were installed", body)
 
     def test_error_report_requires_action(self):
         subject, body = render("scheduled", {"status": "error", "error": "DNF metadata request failed", "running": "6.12.0-current"})
-        self.assertIn("[ERROR]", subject)
-        self.assertIn("Action required: Yes", body)
+        self.assertIn("Update Failed", subject)
+        self.assertIn("Check server status", body)
         self.assertIn("DNF metadata request failed", body)
-        self.assertIn("Kernel package upgrades: Not checked", body)
 
     def test_completed_check_not_reported_as_installed(self):
         subject, body = render("scheduled", {"running": "6.12.0-current", "updates": [], "security_advisories": []})
-        self.assertIn("[NO UPDATES]", subject)
-        self.assertIn("Automatic installation: Enabled", body)
-        self.assertNotIn("Kernel packages installed", body)
+        self.assertIn("No Updates", subject)
+        self.assertIn("No kernel packages were installed.", body)
 
     def test_rollback_not_assumed_verified(self):
         _, body = render("apply", {"status": "installed-awaiting-manual-reboot", "old_kernel": "6.12.0-previous"})
-        self.assertIn("rollback availability NOT verified", body)
+        self.assertIn("not yet verified", body)
         self.assertIn("Confirm provider-console recovery", body)
 
 

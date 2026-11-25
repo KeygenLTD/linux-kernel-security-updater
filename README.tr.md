@@ -13,7 +13,7 @@
   <img alt="LKSU — Linux Kernel Security Updater" src="docs/assets/lksu-banner-light.svg">
 </picture>
 
-![Sürüm](https://img.shields.io/badge/geliştirme-0.3.23.dev0-blue)
+![Sürüm](https://img.shields.io/badge/sürüm-0.3.23-blue)
 ![AlmaLinux](https://img.shields.io/badge/AlmaLinux-8%20%7C%209%20%7C%2010-168B4C)
 ![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB)
 [![Unit tests](https://github.com/KeygenLTD/linux-kernel-security-updater/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/KeygenLTD/linux-kernel-security-updater/actions/workflows/tests.yml)
@@ -37,7 +37,7 @@
 
 **Diğer özellikler:** Türkçe/İngilizce olay e-postaları, sunucuya özel görünen ad, Security Watch, kontrollü eski kernel temizliği ve isteğe bağlı LKSU sürüm kontrolü.
 
-> **Geliştirme durumu:** Depodaki sürüm `0.3.23.dev0`. Testlerin geçmesi bütün üretim ortamlarında güvenli çalışacağı anlamına gelmez. Otomatik yeniden başlatmadan önce harici snapshot ve sağlayıcı konsol erişimini doğrulayın.
+> Otomatik yeniden başlatmadan önce harici snapshot ve sağlayıcı konsol erişimini doğrulayın.
 
 ## Hangi sistemlerde çalışır?
 
@@ -62,7 +62,7 @@ lksu active
 
 Kurulum seçenekleri **gerçek kernel kurulumu ve yeniden başlatma** yetkisi verebilir. Kritik sunucuda önce snapshot, kurtarma konsolu ve servis sağlık kontrollerini hazırlayın.
 
-[Bootstrap betiği](bootstrap.sh) hâlen **v0.3.22** sürümüne sabitlenmiştir; geliştirme sürümünü kurmaz.
+[Bootstrap betiği](bootstrap.sh) **v0.3.23** sürümüne sabitlenmiştir.
 
 ## 📧 SMTP ve e-posta bildirimleri
 

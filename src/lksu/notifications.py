@@ -29,13 +29,12 @@ def classify(command, result):
         ]
     if status == "self-updated":
         return "lksu-updated", [result.get("installed_version")]
+    # Intermediate boot stages are logged locally, never emailed as success.
+    # Manual reboot is a real operator action, so notify only when needed.
     if status == "installed-awaiting-manual-reboot":
-        return "kernel-installed", [result.get("old_kernel"), result.get("new_default")]
+        return "action:manual-reboot", [result.get("old_kernel"), result.get("new_default")]
     if status == "trial-boot-staged" or (command == "stage-reboot" and result.get("trial_entry")):
-        trial = result.get("trial_boot") or result
-        return "kernel-trial-staged", [
-            trial.get("trial_entry"), result.get("new_default"), result.get("old_kernel")
-        ]
+        return None
     if command == "verify" and result.get("verification_performed") is not False and "healthy" in result:
         if result["healthy"]:
             return "kernel-verified", [result.get("running"), result.get("old_kernel")]
